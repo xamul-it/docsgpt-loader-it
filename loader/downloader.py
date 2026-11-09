@@ -49,6 +49,7 @@ import os
 import re
 import shutil
 import sys
+import tempfile
 import threading
 import time
 import unicodedata
@@ -68,6 +69,38 @@ UA = (
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36 "
     "FiscalArchiveCollector/1.1"
 )
+
+# Le fonti curate (siti di regioni, comuni, ministeri) si presentano col nome
+# del progetto: lo UA da browser con suffisso da bot qui sopra fa rispondere
+# HTTP 500 a regione.vda.it, mentre un'identificazione onesta passa.
+CURATED_UA = "docsgpt-loader-it/1.1 (+https://github.com/xamul-it/docsgpt-loader-it)"
+
+# Certificati intermedi che alcuni server non inviano (def.finanze.it,
+# consiglio.vda.it): aggiunti al bundle CA usato dalle richieste.
+EXTRA_CA_DIR = Path(__file__).resolve().parent / "certs"
+_CA_BUNDLE: Optional[str] = None
+_CA_BUNDLE_LOCK = threading.Lock()
+
+
+def http_for_kind(kind: str) -> "Http":
+    return Http(CURATED_UA if kind == "curated" else UA)
+
+
+def ca_bundle() -> str:
+    """Bundle CA (quello di REQUESTS_CA_BUNDLE o di certifi, più gli intermedi
+    di EXTRA_CA_DIR), scritto una volta per processo in un file temporaneo."""
+    global _CA_BUNDLE
+    with _CA_BUNDLE_LOCK:
+        if _CA_BUNDLE is None:
+            import certifi
+            base = os.environ.get("REQUESTS_CA_BUNDLE") or certifi.where()
+            parts = [Path(base).read_text()]
+            parts += [pem.read_text() for pem in sorted(EXTRA_CA_DIR.glob("*.pem"))]
+            fd, path = tempfile.mkstemp(prefix="docsgpt-loader-ca-", suffix=".pem")
+            with os.fdopen(fd, "w") as f:
+                f.write("\n".join(p.strip() for p in parts) + "\n")
+            _CA_BUNDLE = path
+        return _CA_BUNDLE
 
 TIMEOUT = 40
 # Documenti elaborati in parallelo e richieste al secondo verso uno stesso host.
@@ -530,7 +563,8 @@ def retry_after_seconds(resp: requests.Response) -> float:
 
 
 class Http:
-    def __init__(self):
+    def __init__(self, user_agent: str = UA):
+        self.user_agent = user_agent
         self.local = threading.local()
         self.limiters: dict[str, HostLimiter] = {}
         self.lock = threading.Lock()
@@ -544,10 +578,11 @@ class Http:
         if s is None:
             s = self.local.s = requests.Session()
             s.headers.update({
-                "User-Agent": UA,
+                "User-Agent": self.user_agent,
                 "Accept-Language": "it-IT,it;q=0.9,en;q=0.6",
                 "Accept": "text/html,application/xhtml+xml,application/pdf;q=0.9,*/*;q=0.8",
             })
+            s.verify = ca_bundle()
         return s
 
     def limiter(self, url: str) -> HostLimiter:
@@ -1984,9 +2019,9 @@ def run_one(target: Path, source_name: str, mode: str):
     print("=" * 78)
 
     store = (SplitStore if cfg.get("split_by_type") else Store)(target, source_name, mode)
-    http = Http()
-
     kind = cfg["kind"]
+    http = http_for_kind(kind)
+
     try:
         if kind == "crawl":
             crawl_source(http, store, source_name, cfg, mode)

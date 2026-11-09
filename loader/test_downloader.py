@@ -441,3 +441,23 @@ class CuratedTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CuratedHttpIdentityTest(unittest.TestCase):
+    """Le fonti curate (siti di regioni e comuni) si presentano col nome del
+    progetto: lo UA da browser con suffisso da bot faceva rispondere HTTP 500
+    a regione.vda.it, mentre wget o un'identificazione onesta passano."""
+
+    def test_curated_sources_use_project_user_agent(self):
+        http = d.http_for_kind("curated")
+        self.assertEqual(http.s.headers["User-Agent"], d.CURATED_UA)
+        self.assertIn("docsgpt-loader-it", d.CURATED_UA)
+        self.assertNotIn("Mozilla", d.CURATED_UA)
+
+    def test_other_sources_keep_the_original_user_agent(self):
+        self.assertEqual(d.http_for_kind("crawl").s.headers["User-Agent"], d.UA)
+
+    def test_extra_intermediate_certificates_are_in_the_ca_bundle(self):
+        bundle = Path(d.http_for_kind("curated").s.verify).read_text()
+        for pem in d.EXTRA_CA_DIR.glob("*.pem"):
+            self.assertIn(pem.read_text().strip(), bundle)

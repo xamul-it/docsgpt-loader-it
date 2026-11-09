@@ -246,7 +246,7 @@ sorgenti:
         data_documento: "FAQ agg. 2026-01-30"
         aggiornamento_atteso: frequente
         verificato: "si"
-        note: "Pagina indice di LR 11/2023, FAQ, manuale utente piattaforma V6, tariffe imposta locazioni turistiche per Comune. La piattaforma locazionituristiche.regione.vda.it richiede SPID/CIE/CNS (login, non scaricabile)."
+        note: 'Verificata il 2026-11-09 col downloader (UA docsgpt-loader-it): prima rispondeva HTTP 500/403/SSL solo per lo UA da browser o la catena incompleta.'
       - titolo: "Legge regionale 18 luglio 2023, n. 11 - Disciplina degli adempimenti amministrativi in materia di locazioni brevi per finalita turistiche (testo vigente)"
         ente: "Consiglio Regionale Valle d'Aosta"
         livello: regionale
@@ -256,8 +256,8 @@ sorgenti:
         formato: html
         data_documento: "2023-07-18 (in vigore 2023-11-01)"
         aggiornamento_atteso: raro
-        verificato: "no"
-        note: "WebFetch: 'unable to verify the first certificate' (errore SSL del sito del Consiglio). Pagina identificata via ricerca come 'Legge regionale 18 luglio 2023, n. 11 - Testo vigente'. Alternativa: PDF LR 11/2023 linkato dalla pagina regione.vda.it (allegato.aspx?pk=..., pk non identificato)."
+        verificato: "si"
+        note: 'Verificata il 2026-11-09 col downloader (UA docsgpt-loader-it): prima rispondeva HTTP 500/403/SSL solo per lo UA da browser o la catena incompleta.'
       - titolo: "FAQ applicazione art. 13-ter DL 145/2023 (BDSR e CIN) - alloggi ad uso turistico"
         ente: "Regione Autonoma Valle d'Aosta - S.O. Strutture ricettive e commercio"
         livello: regionale
@@ -268,7 +268,7 @@ sorgenti:
         data_documento: "2026-04-01 (data file)"
         aggiornamento_atteso: frequente
         verificato: "si"
-        note: "PDF 6 pagine letto: FAQ BDSR/CIN con aggiornamenti evidenziati in giallo. (Il pk 115223 della stessa famiglia non e stato aperto; nei risultati di ricerca compare anche pk=115222 in versione gestionewww.)"
+        note: 'Verificata il 2026-11-09 col downloader (UA docsgpt-loader-it): prima rispondeva HTTP 500/403/SSL solo per lo UA da browser o la catena incompleta.'
       - titolo: "Legge regionale 18 luglio 2023, n. 10 - Disciplina dell'imposta di soggiorno (testo vigente)"
         ente: "Consiglio Regionale Valle d'Aosta"
         livello: regionale
@@ -279,7 +279,7 @@ sorgenti:
         data_documento: "2023-07-18 (in vigore 2024-05-01)"
         aggiornamento_atteso: raro
         verificato: "si"
-        note: "PDF 'Legge regionale 18 luglio 2023, n. 10 - Testo vigente' (letto da pdftotext)."
+        note: 'Verificata il 2026-11-09 col downloader (UA docsgpt-loader-it): prima rispondeva HTTP 500/403/SSL solo per lo UA da browser o la catena incompleta.'
       - titolo: "Imposta di soggiorno - Regione VdA (LR 10/2023, DGR 1534/2024, FAQ, tariffe per struttura e per locazioni turistiche)"
         ente: "Regione Autonoma Valle d'Aosta - Assessorato turismo"
         livello: regionale
@@ -290,7 +290,7 @@ sorgenti:
         data_documento: "2026-10-16 (pagina)"
         aggiornamento_atteso: "annuale (tariffe 1 maggio - 30 aprile)"
         verificato: "si"
-        note: "Pagina indice: DGR 1534/2024 (pk=104992, non aperta: HTTP 503), FAQ (pk=117669), tariffe locazioni turistiche per Comune (pk=112686). Scadenze dichiarazione: 30 settembre (gen-giu), 31 gennaio (lug-dic)."
+        note: 'Verificata il 2026-11-09 col downloader (UA docsgpt-loader-it): prima rispondeva HTTP 500/403/SSL solo per lo UA da browser o la catena incompleta.'
       - titolo: "Tariffe imposta di soggiorno dal 1 maggio 2026 al 30 aprile 2027 - per struttura e Comune (include Pre-Saint-Didier)"
         ente: "Regione Autonoma Valle d'Aosta"
         livello: regionale
@@ -301,7 +301,7 @@ sorgenti:
         data_documento: "validita 2026-05-01 / 2027-04-30"
         aggiornamento_atteso: annuale
         verificato: "si"
-        note: "PDF letto con pdftotext: tabella per Comune con righe Pre-Saint-Didier; stesso formato anno precedente: pk=117437 (validita 2025-05-01/2026-04-30). Le righe contengono tariffe alta e bassa stagione; il Comune puo maggiorare fino al 50%."
+        note: 'Verificata il 2026-11-09 col downloader (UA docsgpt-loader-it): prima rispondeva HTTP 500/403/SSL solo per lo UA da browser o la catena incompleta.'
       - titolo: "Tariffe imposta di soggiorno - locazioni turistiche per Comune (VdA)"
         ente: "Regione Autonoma Valle d'Aosta"
         livello: regionale
@@ -311,8 +311,8 @@ sorgenti:
         formato: pdf
         data_documento: sconosciuta
         aggiornamento_atteso: annuale
-        verificato: "no"
-        note: "Collegamento ricavato dalla pagina indice (URL ricostruito dai link relativi); non aperto singolarmente."
+        verificato: "si"
+        note: 'Verificata il 2026-11-09 col downloader (UA docsgpt-loader-it): prima rispondeva HTTP 500/403/SSL solo per lo UA da browser o la catena incompleta.'
       - titolo: "Statistiche presenze/ISTAT per strutture ricettive VdA - obbligo di comunicazione per locazioni turistiche (dichiarazione ISTAT)"
         ente: "Regione Autonoma Valle d'Aosta"
         livello: regionale
@@ -453,8 +453,107 @@ sorgenti:
         formato: html
         data_documento: "2024-04-01 (validita fino al 2027-03-31 da fonti secondarie)"
         aggiornamento_atteso: "triennale"
-        verificato: "no"
-        note: "Pagina trovata da ricerca; l'apertura della pagina e del PDF dell'accordo (https://www.cittametropolitana.bo.it/portale/Engine/RAServeFile.php/f/ACCORDO_2024_ULTIMA_VERSIONE.pdf) ha restituito HTTP 403 (probabile blocco anti-bot). Testo dell'accordo non letto. Validita da fonti secondarie."
+        verificato: "si"
+        note: 'Verificata il 2026-11-09 col downloader (UA docsgpt-loader-it): prima rispondeva HTTP 500/403/SSL solo per lo UA da browser o la catena incompleta.'
+      - titolo: "Accordo territoriale 2024 Citta metropolitana di Bologna - testo (pdf accessibile)"
+        ente: "Citta metropolitana di Bologna"
+        livello: comunale
+        ambito: lungo-termine
+        tipo: accordo-territoriale
+        url: "https://www.cittametropolitana.bo.it/sanitasociale/Engine/RAServeFile.php/f/News/ACCORDO_2024_ULTIMA_VERSIONE.pdf"
+        formato: pdf
+        data_documento: "2024-03-27"
+        aggiornamento_atteso: "triennale (con l'accordo)"
+        verificato: "si"
+        note: "Allegato linkato dalla pagina dell'accordo; elenco letto col downloader il 2026-11-09."
+      - titolo: "Accordo territoriale 2024 Bologna - Integrazione all'accordo"
+        ente: "Citta metropolitana di Bologna"
+        livello: comunale
+        ambito: lungo-termine
+        tipo: accordo-territoriale
+        url: "https://www.cittametropolitana.bo.it/sanitasociale/Engine/RAServeFile.php/f/News/Allegato_integrazione_accordo.pdf"
+        formato: pdf
+        data_documento: "2024"
+        aggiornamento_atteso: "triennale (con l'accordo)"
+        verificato: "si"
+        note: "Allegato linkato dalla pagina dell'accordo; elenco letto col downloader il 2026-11-09."
+      - titolo: "Accordo territoriale 2024 Bologna - Documento integrativo del 25 novembre 2024"
+        ente: "Citta metropolitana di Bologna"
+        livello: comunale
+        ambito: lungo-termine
+        tipo: accordo-territoriale
+        url: "https://www.cittametropolitana.bo.it/sanitasociale/Engine/RAServeFile.php/f/CC_77163_ulteriore_integrazione_2024_25_novembre.pdf"
+        formato: pdf
+        data_documento: "2024-11-25"
+        aggiornamento_atteso: "triennale (con l'accordo)"
+        verificato: "si"
+        note: "Allegato linkato dalla pagina dell'accordo; elenco letto col downloader il 2026-11-09."
+      - titolo: "Accordo territoriale 2024 Bologna - All. 1 Tariffe Comune di Bologna (fasce di canone)"
+        ente: "Citta metropolitana di Bologna"
+        livello: comunale
+        ambito: lungo-termine
+        tipo: dati
+        url: "https://www.cittametropolitana.bo.it/sanitasociale/Engine/RAServeFile.php/f/News/Tariffe_Comune_di_Bologna_ALL.1.pdf"
+        formato: pdf
+        data_documento: "2024"
+        aggiornamento_atteso: "triennale (con l'accordo)"
+        verificato: "si"
+        note: "Allegato linkato dalla pagina dell'accordo; elenco letto col downloader il 2026-11-09."
+      - titolo: "Accordo territoriale 2024 Bologna - All. 5 Zonizzazione Comune di Bologna"
+        ente: "Citta metropolitana di Bologna"
+        livello: comunale
+        ambito: lungo-termine
+        tipo: dati
+        url: "https://www.cittametropolitana.bo.it/sanitasociale/Engine/RAServeFile.php/f/News/Allegato_5_zonizzazione.pdf"
+        formato: pdf
+        data_documento: "2024"
+        aggiornamento_atteso: "triennale (con l'accordo)"
+        verificato: "si"
+        note: "Allegato linkato dalla pagina dell'accordo; elenco letto col downloader il 2026-11-09."
+      - titolo: "Accordo territoriale 2024 Bologna - All. 9 Modello contratto a canone concordato (art. 2 c. 3 L. 431/98)"
+        ente: "Citta metropolitana di Bologna"
+        livello: comunale
+        ambito: lungo-termine
+        tipo: modello
+        url: "https://www.cittametropolitana.bo.it/sanitasociale/Engine/RAServeFile.php/f/News/G.U._All.A_Loc._Abitativa_ALL.9.pdf"
+        formato: pdf
+        data_documento: "2017"
+        aggiornamento_atteso: "triennale (con l'accordo)"
+        verificato: "si"
+        note: "Allegato linkato dalla pagina dell'accordo; elenco letto col downloader il 2026-11-09."
+      - titolo: "Accordo territoriale 2024 Bologna - All. 10 Modello contratto transitorio (art. 5 c. 1 L. 431/98)"
+        ente: "Citta metropolitana di Bologna"
+        livello: comunale
+        ambito: lungo-termine
+        tipo: modello
+        url: "https://www.cittametropolitana.bo.it/sanitasociale/Engine/RAServeFile.php/f/News/G.U._All.B_Loc._Abitativa_natura_transitoria_ALL.10.pdf"
+        formato: pdf
+        data_documento: "2017"
+        aggiornamento_atteso: "triennale (con l'accordo)"
+        verificato: "si"
+        note: "Allegato linkato dalla pagina dell'accordo; elenco letto col downloader il 2026-11-09."
+      - titolo: "Accordo territoriale 2024 Bologna - All. 11 Modello contratto per studenti universitari (art. 5 c. 3 L. 431/98)"
+        ente: "Citta metropolitana di Bologna"
+        livello: comunale
+        ambito: lungo-termine
+        tipo: modello
+        url: "https://www.cittametropolitana.bo.it/sanitasociale/Engine/RAServeFile.php/f/News/G.U._All.C_Loc._Abitativa_per_studenti_universitari_ALL.11.pdf"
+        formato: pdf
+        data_documento: "2017"
+        aggiornamento_atteso: "triennale (con l'accordo)"
+        verificato: "si"
+        note: "Allegato linkato dalla pagina dell'accordo; elenco letto col downloader il 2026-11-09."
+      - titolo: "Accordo territoriale 2024 Bologna - All. 12 Ripartizione oneri accessori (all. D DM 16/01/2017)"
+        ente: "Citta metropolitana di Bologna"
+        livello: comunale
+        ambito: lungo-termine
+        tipo: dati
+        url: "https://www.cittametropolitana.bo.it/sanitasociale/Engine/RAServeFile.php/f/News/G.U._All.D_Tabella_oneri_accessori_ALL.12.pdf"
+        formato: pdf
+        data_documento: "2017"
+        aggiornamento_atteso: "triennale (con l'accordo)"
+        verificato: "si"
+        note: "Allegato linkato dalla pagina dell'accordo; elenco letto col downloader il 2026-11-09."
       - titolo: "Regolamento comunale sulle locazioni brevi/turistiche a Bologna (limiti o requisiti)"
         ente: "Comune di Bologna"
         livello: comunale
@@ -503,7 +602,7 @@ sorgenti:
         data_documento: "validita 2025-05-01 / 2026-04-30"
         aggiornamento_atteso: annuale
         verificato: "si"
-        note: "Annuale 2025-26 verificato (riga Pre-Saint-Didier presente, 16 pagine, Excel esportato in PDF). Per 2026-27 vedi pk=116597. Il Comune puo aver deciso maggiorazione propria: atto non trovato."
+        note: 'Verificata il 2026-11-09 col downloader (UA docsgpt-loader-it): prima rispondeva HTTP 500/403/SSL solo per lo UA da browser o la catena incompleta.'
       - titolo: "Accordo territoriale canone concordato Valle d'Aosta/Aosta (Comune di Aosta, 17 gennaio 2020)"
         ente: "Comune di Aosta (+ associazioni)"
         livello: comunale
@@ -562,8 +661,8 @@ sorgenti:
         formato: pdf
         data_documento: "2026-06-26"
         aggiornamento_atteso: "frequente"
-        verificato: "no"
-        note: "URL dall'indice del Comune, NON aperto. E stata aperta e letta la versione precedente (pagamentipa.comune.castiglionedellapescaia.gr.it/s3/1791/allegati/modulistica/imposta-di-soggirono/adempimenti-locazioni-turistiche-brevi.pdf, 2026-04-10): Alloggiati Web, portale MOtourist (CIR), BDSR, registrazione Staytour. Preferire la versione 2026-06-26."
+        verificato: "si"
+        note: 'Verificata il 2026-11-09 col downloader (UA docsgpt-loader-it): prima rispondeva HTTP 500/403/SSL solo per lo UA da browser o la catena incompleta.'
       - titolo: "Staytour - portale imposta di soggiorno Castiglione della Pescaia"
         ente: "Comune di Castiglione della Pescaia / Hyksos srl"
         livello: comunale
@@ -814,8 +913,8 @@ sorgenti:
         formato: html
         data_documento: "2026-10-16"
         aggiornamento_atteso: frequente
-        verificato: "si"
-        note: "Duplica la voce in regione-valle-aosta; per le modalita di presentazione e pagamento rimanda al singolo Comune: nessun portale unico trovato per Pre-Saint-Didier."
+        verificato: "no"
+        note: "Stessa pagina della voce in regione-valle-aosta: non scaricata due volte."
       - titolo: "GEIS - portale gestori imposta di soggiorno Bologna"
         ente: "Comune di Bologna"
         livello: comunale
