@@ -1,5 +1,6 @@
-# BOZZA fonti documentali per locazioni (Bologna, Pre-Saint-Didier, Castiglione della Pescaia)
-# Ricerca del 2026-11-09. Nessun documento scaricato in massa: solo apertura di verifica.
+# Elenco curato delle fonti documentali per locazioni (Bologna, Pre-Saint-Didier, Castiglione della Pescaia)
+# Ricerca del 2026-11-09. Letto da downloader.py (kind "curated"): una sorgente per ogni id,
+# `nome` e il nome della sorgente su DocsGPT; si scaricano solo le voci con verificato: "si".
 # Legenda verificato: si = URL aperto e contenuto corrispondente al titolo; no = non aperto, non identificabile o non trovato.
 # Nota Normattiva: gli URL N2Ls?urn:nir:... sono lo schema URN ufficiale; sono stati aperti uno per uno (non solo dedotti).
 # Nota: il testo di Normattiva risulta HTML statico (JS solo per navigazione); per atti lunghi (codice civile) usare "visualizza atto intero"/export.
@@ -8,6 +9,7 @@
 sorgenti:
 
   - id: locazioni-nazionale-affitti-brevi
+    nome: "Locazioni - Nazionale affitti brevi"
     descrizione: "Normativa e pagine istituzionali nazionali su affitti brevi/turistici: art. 4 DL 50/2017, CIN (art. 13-ter DL 145/2023), BDSR, art. 109 TULPS."
     voci:
       - titolo: "DL 24 aprile 2017, n. 50 - art. 4 (Regime fiscale delle locazioni brevi)"
@@ -78,6 +80,7 @@ sorgenti:
         note: "PDF 28 pagine, testo estratto con pdftotext (versione 10.0, 31/03/2025). L'URL ha hash di build: puo cambiare a ogni rilascio, quindi non e stabile; reperirlo dal portale."
 
   - id: locazioni-nazionale-lungo-termine
+    nome: "Locazioni - Nazionale lungo termine"
     descrizione: "Testi vigenti su locazioni abitative e condominio, canone concordato (DM 16/01/2017), APE, indici ISTAT FOI."
     voci:
       - titolo: "Codice civile (RD 262/1942) - Libro IV: locazione artt. 1571-1614 e condominio artt. 1117-1139"
@@ -159,6 +162,7 @@ sorgenti:
         note: "HTML renderizzato lato server, valori FOI (base 2025=100) nel testo; tabelle/coefficienti scaricabili in xlsx/pdf e calcolatore rivaluta.istat.it (applicazione esterna, probabile JS)."
 
   - id: regione-emilia-romagna
+    nome: "Locazioni - Regione Emilia-Romagna"
     descrizione: "Emilia-Romagna: L.R. 16/2004, CIR/CIN, locazioni turistiche, circolari regionali, Ross1000."
     voci:
       - titolo: "L.R. 28 luglio 2004, n. 16 - Disciplina delle strutture ricettive dirette all'ospitalita (art. 35-bis CIR, art. 12 appartamenti)"
@@ -229,6 +233,7 @@ sorgenti:
         note: "Aperta la pagina regionale 'Manuale Ross1000 - Profilo Albergatore - Inserimento clienti' (il PDF collegato, 'Profilo struttura - Caricamento manuale', non e stato aperto; l'URL .pdf indicato qui e quello del risultato di ricerca). E un manuale per la struttura ricettiva, non specifico per locazioni turistiche. Non trovata una fonte regionale ufficiale sull'obbligo statistico per le locazioni turistiche (solo blog commerciali)."
 
   - id: regione-valle-aosta
+    nome: "Locazioni - Regione Valle d'Aosta"
     descrizione: "Valle d'Aosta: L.R. 11/2023 locazioni turistiche (CIR dal Comune via piattaforma), L.R. 10/2023 imposta di soggiorno, FAQ BDSR/CIN, tariffe."
     voci:
       - titolo: "Locazioni turistiche - Regione Autonoma Valle d'Aosta (L.R. 11/2023, piattaforma, manuali, FAQ)"
@@ -321,6 +326,7 @@ sorgenti:
         note: "Non trovata una pagina ufficiale con l'obbligo. La pagina 'Locazioni turistiche' cita video tutorial 'dichiarazione presenze ISTAT' e contatto supporto.istat@regione.vda.it (0165.275602): da approfondire dentro la piattaforma (login)."
 
   - id: regione-toscana
+    nome: "Locazioni - Regione Toscana"
     descrizione: "Toscana: L.R. 61/2024 (Testo unico turismo), regolamento 47/R/2025, MOtourist Office/CIR, poteri dei comuni sulle locazioni brevi."
     voci:
       - titolo: "Regione Toscana - Il nuovo Testo unico del turismo e il Regolamento di attuazione"
@@ -380,6 +386,7 @@ sorgenti:
         note: "La Questura di Grosseto rimanda a una pagina Regione Toscana sulle locazioni turistiche, ma l'URL non e stato ricavato; la ricerca non ha dato una pagina regionale ufficiale dedicata."
 
   - id: comune-bologna
+    nome: "Locazioni - Comune di Bologna"
     descrizione: "Bologna: imposta di soggiorno (regolamento, tariffe 2026, adempimenti), accordo territoriale canone concordato (Citta metropolitana)."
     voci:
       - titolo: "DG/PRO/2025/283 - Approvazione delle tariffe 2026 per l'imposta di soggiorno"
@@ -461,6 +468,7 @@ sorgenti:
         note: "Cercata ma non trovata alcuna delibera comunale su limiti alle locazioni brevi. In E-R i poteri sono limitati (L.R. 16/2004 e modifiche): da verificare se esistono atti recenti."
 
   - id: comune-pre-saint-didier
+    nome: "Locazioni - Comune di Pre-Saint-Didier"
     descrizione: "Pre-Saint-Didier (AO): imposta di soggiorno (regole regionali + eventuale maggiorazione comunale), accordo canone concordato, nessun atto comunale individuato."
     voci:
       - titolo: "Comune di Pre-Saint-Didier - sito istituzionale (sezioni tributi, servizi, turismo)"
@@ -509,6 +517,7 @@ sorgenti:
         note: "Aperta solo la scheda dell'attestazione di rispondenza (Ufficio IMU; PDF modulo), NON il testo dell'accordo. L'accordo riguarda il solo Comune di Aosta: per Pre-Saint-Didier non risulta un accordo locale (senza accordo vale il contratto ponte/DM 16/01/2017). Notizia CELVA sull'accordo 2019 (celva.it ...nuovi-accordi-territoriali-aosta-2019/) restituisce 404."
 
   - id: comune-castiglione-pescaia
+    nome: "Locazioni - Comune di Castiglione della Pescaia"
     descrizione: "Castiglione della Pescaia (GR): imposta di soggiorno (regolamento, tariffe 2026), adempimenti locazioni brevi, accordo canone concordato (Grosseto)."
     voci:
       - titolo: "Documenti relativi imposta di soggiorno - Comune di Castiglione della Pescaia (indice)"
@@ -590,6 +599,7 @@ sorgenti:
         note: "Non trovata alcuna delibera. L'art. 59 L.R. 61/2024 consente limiti solo ai comuni ad alta densita turistica/capoluoghi: appartenenza di Castiglione non verificata."
 
   - id: piattaforme-affitti-brevi
+    nome: "Locazioni - Piattaforme affitti brevi"
     descrizione: "Pagine di aiuto di Airbnb e Booking.com per l'Italia (ritenuta 21%, comunicazioni, CIN, imposta di soggiorno)."
     voci:
       - titolo: "Panoramica riguardante le ritenute fiscali sul reddito per gli host in Italia (Airbnb Help article 3527)"
@@ -704,6 +714,7 @@ sorgenti:
         note: "Trovato da ricerca, non aperto; in inglese e generico (non solo Italia). Non trovata una pagina Booking in italiano su imposta di soggiorno/CIN in Italia."
 
   - id: servizi-pa
+    nome: "Locazioni - Servizi PA"
     descrizione: "Portali e manuali PA: Alloggiati Web (Polizia di Stato), BDSR/CIN, RLI web e istruzioni modello RLI (Agenzia delle Entrate), portali imposta di soggiorno."
     voci:
       - titolo: "Guida Servizio Alloggiati Web (manuale utente, 35 pagine)"

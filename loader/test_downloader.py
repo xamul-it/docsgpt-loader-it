@@ -4,6 +4,7 @@
   python3 -m unittest test_downloader -v
 """
 
+import hashlib
 import json
 import tempfile
 import threading
@@ -245,6 +246,189 @@ class SplitStoreTest(unittest.TestCase):
                 self.assertEqual([r["source"] for r in rows], [f"normativa/{folder}"])
                 self.assertTrue((root / rows[0]["local_file"]).is_file())
                 self.assertTrue(rows[0]["local_file"].startswith("files/2024/"))
+
+
+CURATED_YAML = """
+sorgenti:
+  - id: comune-prova
+    nome: "Locazioni - Comune di Prova"
+    descrizione: "Sorgente di prova."
+    voci:
+      - titolo: "Regolamento imposta di soggiorno"
+        ente: "Comune di Prova"
+        livello: comune
+        ambito: affitti-brevi
+        tipo: regolamento
+        url: "https://www.comune.prova.it/regolamento"
+        formato: html
+        data_documento: "2024-01-15"
+        aggiornamento_atteso: annuale
+        verificato: "si"
+        note: ""
+      - titolo: "Tariffe 2026"
+        ente: "Comune di Prova"
+        livello: comune
+        ambito: affitti-brevi
+        tipo: tariffe
+        url: "https://www.comune.prova.it/tariffe.pdf"
+        formato: pdf
+        data_documento: "2026-01-01"
+        aggiornamento_atteso: annuale
+        verificato: "si"
+        note: ""
+      - titolo: "Pagina non controllata"
+        ente: "Comune di Prova"
+        livello: comune
+        ambito: affitti-brevi
+        tipo: faq
+        url: "https://www.comune.prova.it/faq"
+        formato: html
+        data_documento: ""
+        aggiornamento_atteso: raro
+        verificato: "no"
+        note: ""
+  - id: regione-prova
+    nome: "Locazioni - Regione Prova"
+    descrizione: "Altra sorgente."
+    voci: []
+"""
+
+
+class FakeFetcher:
+    """Risponde alle GET con i contenuti dati (url -> bytes); un'eccezione se il valore e' un errore."""
+
+    def __init__(self, pages):
+        self.pages = dict(pages)
+        self.urls = []
+
+    def map(self, fn, items):
+        return [fn(x) for x in items]
+
+    def get(self, url, **kwargs):
+        self.urls.append(url)
+        page = self.pages[url]
+        if isinstance(page, Exception):
+            raise page
+        return SimpleNamespace(url=url, content=page, headers={}, text=page.decode("utf-8", "ignore"))
+
+
+class CuratedTest(unittest.TestCase):
+    """Kind "curated": elenco curato in YAML, una sorgente per amministrazione."""
+
+    HTML = b"<html><body>Regolamento</body></html>"
+    PDF = b"%PDF-1.4 tariffe"
+    URL_HTML = "https://www.comune.prova.it/regolamento"
+    URL_PDF = "https://www.comune.prova.it/tariffe.pdf"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.yaml_path = self.root / "locazioni.yaml"
+        self.yaml_path.write_text(CURATED_YAML, encoding="utf-8")
+        self.sources = d.curated_sources(self.yaml_path)
+        self.addCleanup(setattr, d, "VERBOSE", d.VERBOSE)
+        d.VERBOSE = 0
+
+    def run_source(self, pages, mode="refresh", name="locazioni/comune-prova"):
+        http = FakeFetcher(pages)
+        store = d.Store(self.root / "archivio", name, mode)
+        with mock.patch("builtins.print"):
+            stats = d.curated_source(http, store, name, self.sources[name], mode)
+        store.compact()
+        return http, store, stats
+
+    def manifest(self, name="locazioni/comune-prova"):
+        path = self.root / "archivio" / name / "manifest.jsonl"
+        return [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines()]
+
+    def test_una_sorgente_per_id_con_nome_locazioni(self):
+        self.assertEqual(set(self.sources), {"locazioni/comune-prova", "locazioni/regione-prova"})
+        cfg = self.sources["locazioni/comune-prova"]
+        self.assertEqual(cfg["kind"], "curated")
+        self.assertEqual(cfg["label"], "Locazioni - Comune di Prova")
+        self.assertEqual(len(cfg["voci"]), 3)
+
+    def test_il_file_vero_registra_le_sorgenti_e_il_gruppo(self):
+        real = d.curated_sources()
+        self.assertEqual(len(real), 10)
+        self.assertIn("locazioni/comune-bologna", real)
+        self.assertTrue(all(n in d.SOURCES for n in real))
+        self.assertEqual(sorted(d.expand_source("locazioni")), sorted(real))
+        self.assertIn("locazioni", d.source_choices())
+
+    def test_le_voci_non_verificate_sono_saltate_e_registrate(self):
+        http, store, stats = self.run_source({self.URL_HTML: self.HTML, self.URL_PDF: self.PDF})
+        self.assertNotIn("https://www.comune.prova.it/faq", http.urls)
+        self.assertEqual((stats["downloaded"], stats["skipped_unverified"], stats["errors"]), (2, 1, 0))
+        log = (self.root / "archivio" / "locazioni/comune-prova" / "errors.log").read_text(encoding="utf-8")
+        self.assertIn("Pagina non controllata", log)
+        self.assertIn("non verificata, saltata", log)
+
+    def test_manifest_con_i_campi_delle_altre_sorgenti_e_quelli_curati(self):
+        self.run_source({self.URL_HTML: self.HTML, self.URL_PDF: self.PDF})
+        rows = {r["title"]: r for r in self.manifest()}
+        r = rows["Regolamento imposta di soggiorno"]
+        self.assertEqual(r["source"], "locazioni/comune-prova")
+        self.assertEqual(r["authority"], "Comune di Prova")
+        self.assertEqual(r["document_type"], "regolamento")
+        self.assertEqual(r["document_date"], "2024-01-15")
+        self.assertEqual(r["detail_url"], self.URL_HTML)
+        self.assertEqual(r["download_url"], self.URL_HTML)
+        self.assertEqual((r["livello"], r["ambito"], r["aggiornamento_atteso"]), ("comune", "affitti-brevi", "annuale"))
+        self.assertEqual(r["sha256"], hashlib.sha256(self.HTML).hexdigest())
+        self.assertTrue(r["downloaded_at"])
+
+    def test_estensione_dal_contenuto_non_dal_formato_dichiarato(self):
+        # Il YAML dice pdf per la seconda voce: qui il server restituisce html, e viceversa.
+        self.run_source({self.URL_HTML: self.PDF, self.URL_PDF: self.HTML})
+        rows = {r["title"]: r for r in self.manifest()}
+        self.assertEqual(rows["Regolamento imposta di soggiorno"]["local_file"], "files/regolamento-imposta-di-soggiorno.pdf")
+        self.assertEqual(rows["Tariffe 2026"]["local_file"], "files/tariffe-2026.html")
+        root = self.root / "archivio" / "locazioni/comune-prova"
+        self.assertEqual((root / "files/tariffe-2026.html").read_bytes(), self.HTML)
+
+    def test_refresh_con_sha_invariato_non_riscrive_nulla(self):
+        pages = {self.URL_HTML: self.HTML, self.URL_PDF: self.PDF}
+        self.run_source(pages)
+        before = self.manifest()
+        _, _, stats = self.run_source(pages)
+        self.assertEqual((stats["downloaded"], stats["updated"], stats["unchanged"]), (0, 0, 2))
+        self.assertEqual(self.manifest(), before)
+
+    def test_refresh_con_sha_cambiato_sovrascrive_e_registra_aggiornato(self):
+        self.run_source({self.URL_HTML: self.HTML, self.URL_PDF: self.PDF})
+        nuovo = b"<html><body>Regolamento modificato</body></html>"
+        _, _, stats = self.run_source({self.URL_HTML: nuovo, self.URL_PDF: self.PDF})
+        self.assertEqual((stats["downloaded"], stats["updated"], stats["unchanged"]), (0, 1, 1))
+        root = self.root / "archivio" / "locazioni/comune-prova"
+        self.assertEqual((root / "files/regolamento-imposta-di-soggiorno.html").read_bytes(), nuovo)
+        rows = {r["title"]: r for r in self.manifest()}
+        self.assertEqual(len(rows), 3 - 1)
+        self.assertEqual(rows["Regolamento imposta di soggiorno"]["sha256"], hashlib.sha256(nuovo).hexdigest())
+        self.assertIn("aggiornato", (root / "errors.log").read_text(encoding="utf-8"))
+
+    def test_se_cambia_il_tipo_di_contenuto_il_vecchio_file_sparisce(self):
+        self.run_source({self.URL_HTML: self.HTML, self.URL_PDF: self.PDF})
+        self.run_source({self.URL_HTML: self.PDF, self.URL_PDF: self.PDF})
+        files = sorted(p.name for p in (self.root / "archivio" / "locazioni/comune-prova" / "files").iterdir())
+        self.assertEqual(files, ["regolamento-imposta-di-soggiorno.pdf", "tariffe-2026.pdf"])
+
+    def test_un_errore_di_rete_non_ferma_le_altre_voci(self):
+        _, _, stats = self.run_source({self.URL_HTML: RuntimeError("HTTP 404"), self.URL_PDF: self.PDF})
+        self.assertEqual((stats["downloaded"], stats["errors"]), (1, 1))
+        log = (self.root / "archivio" / "locazioni/comune-prova" / "errors.log").read_text(encoding="utf-8")
+        self.assertIn("HTTP 404", log)
+        self.assertEqual([r["title"] for r in self.manifest()], ["Tariffe 2026"])
+
+    def test_sorgente_senza_voci_non_fallisce(self):
+        _, _, stats = self.run_source({}, name="locazioni/regione-prova")
+        self.assertEqual(stats["downloaded"], 0)
+
+    def test_voce_senza_campi_obbligatori_e_rifiutata(self):
+        self.yaml_path.write_text("sorgenti:\n  - id: x\n    nome: X\n    voci:\n      - titolo: senza url\n        verificato: 'si'\n", encoding="utf-8")
+        with self.assertRaises(ValueError):
+            d.curated_sources(self.yaml_path)
 
 
 if __name__ == "__main__":

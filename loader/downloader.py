@@ -28,6 +28,12 @@ normativa e giurisprudenza si suddividono da sole per tipo: normativa/legge, giu
       manifest.jsonl
       errors.log
 
+Le fonti "curate" (--source locazioni, locazioni/comune-bologna, ...) non si
+scoprono da un sito: l'elenco è in fonti/locazioni.yaml, una sorgente per
+amministrazione, e si scaricano solo le voci con verificato: "si". Ogni file
+si chiama come lo slug del titolo e ha estensione .pdf o .html secondo il
+contenuto; nel manifest si aggiungono livello, ambito e aggiornamento_atteso.
+
 Il manifest contiene almeno:
   source, title, document_date, authority, document_type,
   detail_url, download_url, local_file, sha256, downloaded_at
@@ -216,6 +222,53 @@ SOURCES = {
     },
 }
 
+# Elenco curato delle fonti sulle locazioni, relativo a questo file: lo script
+# gira anche dal container del notifier, dove la cartella è montata in /loader.
+CURATED_YAML = Path(__file__).resolve().parent / "fonti" / "locazioni.yaml"
+CURATED_REQUIRED = ("titolo", "ente", "tipo", "url", "verificato")
+
+
+def curated_slug(title: str, max_len: int = 120) -> str:
+    """Slug del titolo: minuscolo, ASCII, parole separate da trattini."""
+    s = unicodedata.normalize("NFKD", title)
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    s = re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
+    return s[:max_len].strip("-") or "documento"
+
+
+def curated_sources(path: Path = CURATED_YAML) -> dict[str, dict]:
+    """Una sorgente "locazioni/<id>" per ogni sorgenti[].id dell'elenco curato."""
+    import yaml  # qui e non in cima: il resto dello script non ne ha bisogno
+
+    data = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+    out = {}
+    for src in data.get("sorgenti") or []:
+        voci = src.get("voci") or []
+        slugs = set()
+        for voce in voci:
+            missing = [k for k in CURATED_REQUIRED if not voce.get(k)]
+            if missing:
+                raise ValueError(f"{path.name}, {src.get('id')}: voce {voce.get('titolo')!r} senza {', '.join(missing)}")
+            slug = curated_slug(voce["titolo"])
+            if slug in slugs:
+                raise ValueError(f"{path.name}, {src.get('id')}: due voci con lo stesso slug {slug!r}")
+            slugs.add(slug)
+        out[f"locazioni/{src['id']}"] = {
+            "label": src.get("nome") or f"Locazioni - {src['id']}",
+            "kind": "curated",
+            "descrizione": src.get("descrizione", ""),
+            "voci": voci,
+        }
+    return out
+
+
+try:
+    SOURCES.update(curated_sources())
+except ImportError:
+    # Senza PyYAML (es. il container del notifier) le fonti curate non ci sono:
+    # le altre raccolte funzionano come prima.
+    pass
+
 # Gruppi: il primo livello di cartella seleziona tutte le sue tipologie
 # (--source agenzia-entrate).
 SOURCE_GROUPS: dict[str, list[str]] = {}
@@ -251,6 +304,14 @@ class Doc:
     local_file: str = ""
     sha256: str = ""
     downloaded_at: str = ""
+
+
+@dataclass
+class CuratedDoc(Doc):
+    """Voce dell'elenco curato: in più i campi che la descrivono."""
+    livello: str = ""
+    ambito: str = ""
+    aggiornamento_atteso: str = ""
 
 
 def now_iso() -> str:
@@ -1766,6 +1827,72 @@ def cedef_source(http: Http, store: Store, source_name: str, cfg: dict, mode: st
 # CLI
 # ---------------------------------------------------------------------------
 
+def curated_source(http: Http, store: Store, source_name: str, cfg: dict, mode: str) -> dict:
+    """Scarica le voci verificate di una sorgente dell'elenco curato.
+
+    Refresh: se il file c'è già con lo stesso sha256 non si tocca nulla; se lo
+    sha cambia il file è sovrascritto, il manifest aggiornato e la cosa
+    annotata in errors.log come "aggiornato". Le voci non verificate sono
+    saltate e annotate allo stesso modo.
+    """
+    stats = {"downloaded": 0, "updated": 0, "unchanged": 0, "skipped_unverified": 0, "errors": 0}
+    voci = []
+    for voce in cfg["voci"]:
+        if str(voce.get("verificato", "")).strip().lower() == "si":
+            voci.append(voce)
+        else:
+            stats["skipped_unverified"] += 1
+            store.error(f"{voce['titolo']} <{voce['url']}>: non verificata, saltata")
+
+    def fetch(voce: dict) -> str:
+        url = voce["url"]
+        try:
+            content = http.get(url).content
+            if not content:
+                raise RuntimeError("risposta vuota")
+            ext = ".pdf" if content.lstrip().startswith(b"%PDF-") else ".html"
+            sha = hashlib.sha256(content).hexdigest()
+            old = store.existing.get(url)
+            have_old = mode == "refresh" and store.has_file(old)
+            if have_old and old.get("sha256") == sha:
+                return "unchanged"
+            out = store.files / f"{curated_slug(voce['titolo'])}{ext}"
+            write_atomic(out, content)
+            if have_old and store.root / old["local_file"] != out:
+                (store.root / old["local_file"]).unlink(missing_ok=True)
+            store.append(CuratedDoc(
+                source=source_name,
+                title=voce["titolo"],
+                document_date=str(voce.get("data_documento") or ""),
+                authority=voce["ente"],
+                document_type=voce["tipo"],
+                detail_url=url,
+                download_url=url,
+                local_file=str(out.relative_to(store.root)),
+                sha256=sha,
+                downloaded_at=now_iso(),
+                livello=voce.get("livello", ""),
+                ambito=voce.get("ambito", ""),
+                aggiornamento_atteso=voce.get("aggiornamento_atteso", ""),
+            ))
+            if have_old:
+                store.error(f"{voce['titolo']} <{url}>: aggiornato")
+                print(f"  ~ aggiornato: {out.name}")
+                return "updated"
+            print(f"  + {voce['titolo']} -> files/{out.name}")
+            return "downloaded"
+        except Exception as e:
+            store.error(f"{voce['titolo']} <{url}>: {e}")
+            print(f"  ! {voce['titolo']}: {e}")
+            return "errors"
+
+    for outcome in http.map(fetch, voci):
+        stats[outcome] += 1
+    print(f"  {stats['downloaded']} scaricati, {stats['updated']} aggiornati, {stats['unchanged']} invariati, "
+          f"{stats['skipped_unverified']} non verificati saltati, {stats['errors']} errori")
+    return stats
+
+
 def prompt_choice(prompt: str, choices: list[str]) -> str:
     print(prompt)
     for i, c in enumerate(choices, 1):
@@ -1858,6 +1985,8 @@ def run_one(target: Path, source_name: str, mode: str):
     try:
         if kind == "crawl":
             crawl_source(http, store, source_name, cfg, mode)
+        elif kind == "curated":
+            curated_source(http, store, source_name, cfg, mode)
         elif kind == "cedef-prassi":
             cedef_source(http, store, source_name, cfg, mode, "prassi")
         elif kind == "cedef-normativa":
