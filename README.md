@@ -26,6 +26,6 @@ repository. La cartella dell'archivio si passa agli script con `--target`.
 
 - `docker-compose-standalone.yaml` non è versionato perché contiene
   credenziali; va pubblicato come esempio senza segreti.
-- Gli script in `loader/` sono anche copiati nella cartella dell'archivio,
-  dove li esegue il container `notifier`: finché il notifier non legge da
-  `loader/`, le modifiche vanno riportate lì.
+- Il container `notifier` monta `loader/` in sola lettura (`/loader`) ed
+  esegue gli script da lì. Nella cartella dell'archivio gli script sono link
+  a `loader/`, per lanciarli a mano con i comandi di sempre.

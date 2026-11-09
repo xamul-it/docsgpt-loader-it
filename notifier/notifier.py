@@ -73,6 +73,9 @@ def env(name: str, default: str = "") -> str:
 
 class Config:
     archive_dir = Path(env("ARCHIVE_DIR", "/archive"))
+    # Script del loader (downloader.py, carica_docsgpt.py): dal repository,
+    # montato in sola lettura. Ripiego sull'archivio per i vecchi deploy.
+    loader_dir = Path(env("LOADER_DIR", "/loader"))
     state_file = Path(env("STATE_DIR", "/state")) / "state.json"
     links_file = Path(env("DOC_LINKS_FILE", "/doc_links/doc_links.json"))
 
@@ -479,9 +482,14 @@ def manifest_rows(ente: str):
                 yield f"{manifest.parent.relative_to(Config.archive_dir)}|{ident}", manifest.parent, row
 
 
+def loader_script(name: str) -> str:
+    path = Config.loader_dir / name
+    return str(path if path.exists() else Config.archive_dir / name)
+
+
 def run_downloader(ente: str) -> None:
     cmd = [
-        sys.executable, str(Config.archive_dir / "downloader.py"),
+        sys.executable, loader_script("downloader.py"),
         "--target", str(Config.archive_dir), "--source", ente,
         "--mode", "refresh", "--skip-existing",
         # Anno corrente e precedente: copre anche gli atti pubblicati a cavallo d'anno.
@@ -583,7 +591,7 @@ def reload_due(state: dict) -> str | None:
 
 def run_reload(ente: str) -> None:
     cmd = [
-        sys.executable, str(Config.archive_dir / "carica_docsgpt.py"),
+        sys.executable, loader_script("carica_docsgpt.py"),
         "--target", str(Config.archive_dir), "--source", ente, "--replace",
         "--api", Config.docsgpt_api,
         "--tmp", str(Config.upload_tmp),
