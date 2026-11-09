@@ -1,0 +1,818 @@
+# BOZZA fonti documentali per locazioni (Bologna, Pre-Saint-Didier, Castiglione della Pescaia)
+# Ricerca del 2026-11-09. Nessun documento scaricato in massa: solo apertura di verifica.
+# Legenda verificato: si = URL aperto e contenuto corrispondente al titolo; no = non aperto, non identificabile o non trovato.
+# Nota Normattiva: gli URL N2Ls?urn:nir:... sono lo schema URN ufficiale; sono stati aperti uno per uno (non solo dedotti).
+# Nota: il testo di Normattiva risulta HTML statico (JS solo per navigazione); per atti lunghi (codice civile) usare "visualizza atto intero"/export.
+# Nota: le date di Normattiva/Regioni nel 2026 sono quelle riportate dalle pagine al momento della verifica.
+
+sorgenti:
+
+  - id: locazioni-nazionale-affitti-brevi
+    descrizione: "Normativa e pagine istituzionali nazionali su affitti brevi/turistici: art. 4 DL 50/2017, CIN (art. 13-ter DL 145/2023), BDSR, art. 109 TULPS."
+    voci:
+      - titolo: "DL 24 aprile 2017, n. 50 - art. 4 (Regime fiscale delle locazioni brevi)"
+        ente: "Normattiva (Presidenza del Consiglio / Poligrafico)"
+        livello: nazionale
+        ambito: affitti-brevi
+        tipo: legge
+        url: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legge:2017-04-24;50~art4"
+        formato: html
+        data_documento: "2017-04-24"
+        aggiornamento_atteso: "raro, ma recentemente modificato"
+        verificato: "si"
+        note: "Pagina aperta, HTML statico. ATTENZIONE: Normattiva segnala che il comma 1 e quasi tutti i commi 2-3-bis, 5-7 sono abrogati dal D.Lgs. 19 giugno 2026, n. 117; restano commi 4 e 7-bis. Probabile riordino fiscale: cercare il D.Lgs. 117/2026 (non verificato qui) e la destinazione della disciplina. Materia fiscale in parte gia coperta da CeDEF, ma il testo vigente dell'art. 4 (definizione, obblighi intermediari) e utile."
+      - titolo: "DL 18 ottobre 2023, n. 145 - art. 13-ter (Disciplina delle locazioni per finalita turistiche, CIN)"
+        ente: "Normattiva"
+        livello: nazionale
+        ambito: affitti-brevi
+        tipo: legge
+        url: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legge:2023-10-18;145~art13ter"
+        formato: html
+        data_documento: "2023-10-18 (conv. L. 191/2023; testo in vigore dal 2025-01-01)"
+        aggiornamento_atteso: "raro (ma L. 199/2025 ha modificato il limite di appartamenti: ricontrollare)"
+        verificato: "si"
+        note: "Vigente, commi 1-15 in HTML statico. Collegata: L. 178/2020 art.1 c.595 (limite 2 appartamenti non imprenditoriali dal 2026 per L. 199/2025, come da circolare Emilia-Romagna) - non cercata su Normattiva."
+      - titolo: "RD 18 giugno 1931, n. 773 (TULPS) - art. 109 (comunicazione alloggiati)"
+        ente: "Normattiva"
+        livello: nazionale
+        ambito: affitti-brevi
+        tipo: legge
+        url: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1931-06-18;773~art109"
+        formato: html
+        data_documento: "1931-06-18 (ultimo agg. atto 2026-04-24)"
+        aggiornamento_atteso: raro
+        verificato: "si"
+        note: "L'atto si apre e art. 109 compare nell'albero con 7 modifiche, ma il testo dell'articolo non e comparso nell'estrazione (carica dopo click/atto intero). Valutare download dell'atto intero (esporta/attoCompleto) invece dell'URL ~art109."
+      - titolo: "Ministero del Turismo - FAQ Banca dati strutture ricettive (BDSR) e CIN"
+        ente: "Ministero del Turismo"
+        livello: nazionale
+        ambito: affitti-brevi
+        tipo: faq
+        url: "https://www.ministeroturismo.gov.it/faq-banca-dati-strutture-ricettive-bdsr/"
+        formato: html
+        data_documento: "agg. 2026-01-16 (secondo fonti secondarie)"
+        aggiornamento_atteso: frequente
+        verificato: "no"
+        note: "WebFetch ha ricevuto solo la pagina anti-bot Radware (stesso esito su /banca-dati-strutture-ricettive/). URL suggerito dal risultato di ricerca (non letto). Richiede browser reale: probabile blocco anche per un crawler semplice."
+      - titolo: "Ministero del Turismo - CIN: termine per l'acquisizione posticipato al 1 gennaio 2025 e contatti utili"
+        ente: "Ministero del Turismo"
+        livello: nazionale
+        ambito: affitti-brevi
+        tipo: faq
+        url: "https://www.ministeroturismo.gov.it/cin-termine-per-lacquisizione-spostato-al-1-gennaio-2025/"
+        formato: html
+        data_documento: "2024-10-22"
+        aggiornamento_atteso: raro (comunicato)
+        verificato: "si"
+        note: "Aperto correttamente (HTML), ma e un comunicato storico utile solo per il contesto. Su questo stesso dominio altre pagine hanno risposto con Radware: l'apertura non e garantita."
+      - titolo: "BDSR - Manuale Operatore Privato - Richiesta CIN (v10.0)"
+        ente: "Ministero del Turismo (BDSR)"
+        livello: nazionale
+        ambito: affitti-brevi
+        tipo: manuale
+        url: "https://bdsr.ministeroturismo.gov.it/assets/MITUR_BDSR_Manuale_Operatore_Privato_10.0-DMbxyZPe-Cigy_Kmo.pdf"
+        formato: pdf
+        data_documento: "2025-03-31"
+        aggiornamento_atteso: "occasionale (nuove versioni; URL contiene hash che cambia)"
+        verificato: "si"
+        note: "PDF 28 pagine, testo estratto con pdftotext (versione 10.0, 31/03/2025). L'URL ha hash di build: puo cambiare a ogni rilascio, quindi non e stabile; reperirlo dal portale."
+
+  - id: locazioni-nazionale-lungo-termine
+    descrizione: "Testi vigenti su locazioni abitative e condominio, canone concordato (DM 16/01/2017), APE, indici ISTAT FOI."
+    voci:
+      - titolo: "Codice civile (RD 262/1942) - Libro IV: locazione artt. 1571-1614 e condominio artt. 1117-1139"
+        ente: "Normattiva"
+        livello: nazionale
+        ambito: lungo-termine
+        tipo: legge
+        url: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262"
+        formato: html
+        data_documento: "1942-03-16 (multivigente)"
+        aggiornamento_atteso: raro
+        verificato: "si"
+        note: "Pagina = atto intero come albero di articoli (167.884 caratteri nella pagina, solo indice/navigazione). Il testo degli articoli 1571-1614 non e inline: usare URN con ~art1571 ecc. oppure esporta atto completo. HTML statico ma pesante; servono richieste per articolo/intervallo."
+      - titolo: "Legge 9 dicembre 1998, n. 431 - Disciplina delle locazioni e del rilascio degli immobili adibiti ad uso abitativo"
+        ente: "Normattiva"
+        livello: nazionale
+        ambito: lungo-termine
+        tipo: legge
+        url: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1998-12-09;431"
+        formato: html
+        data_documento: "1998-12-09 (aggiornato all'atto pubblicato il 2026-08-06)"
+        aggiornamento_atteso: raro
+        verificato: "si"
+        note: "Vista multivigente, testo in HTML statico."
+      - titolo: "Legge 27 luglio 1978, n. 392 - Disciplina delle locazioni di immobili urbani (parti vigenti)"
+        ente: "Normattiva"
+        livello: nazionale
+        ambito: lungo-termine
+        tipo: legge
+        url: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1978-07-27;392"
+        formato: html
+        data_documento: "1978-07-27 (aggiornato a atto del 2026-01-30)"
+        aggiornamento_atteso: raro
+        verificato: "si"
+        note: "Multivigente; la L. 431/1998 ha abrogato parti per le locazioni abitative (restano uso diverso, art. 81 indici ecc.). HTML statico."
+      - titolo: "DM 16 gennaio 2017 (MIT/MEF) - Criteri generali accordi locali canone concordato, transitori, studenti (GU n. 62 del 15-03-2017)"
+        ente: "Ministero delle infrastrutture e dei trasporti / Gazzetta Ufficiale"
+        livello: nazionale
+        ambito: lungo-termine
+        tipo: decreto
+        url: "https://www.gazzettaufficiale.it/atto/vediMenuHTML?atto.codiceRedazionale=17A01858&atto.dataPubblicazioneGazzetta=2017-03-15&tipoSerie=serie_generale&tipoVigenza=originario"
+        formato: html
+        data_documento: "2017-01-16 (GU 2017-03-15)"
+        aggiornamento_atteso: raro
+        verificato: "si"
+        note: "Pagina GU HTML con articoli 1-7 e Allegati A-E come link a pagine separate (non letti). Dal testo del decreto (copia ANCE letta): Allegato D = Tabella oneri accessori locatore/conduttore; A-C = contratti tipo; E = procedura di conciliazione. Per scaricare allegati servono le singole pagine/PDF GU; il PDF integrale GU e scansione OCR sporca. Il sito GU ha anche un guscio JS ('Gazzetta in fase di caricamento') su altri URL."
+      - titolo: "DM 16 gennaio 2017 - testo del decreto (copia testuale, senza allegati)"
+        ente: "ANCE (copia)"
+        livello: nazionale
+        ambito: lungo-termine
+        tipo: decreto
+        url: "https://ance.it/wp-content/uploads/archive/28004-DM 16-01-2017.pdf"
+        formato: pdf
+        data_documento: "2017-03-15"
+        aggiornamento_atteso: raro
+        verificato: "si"
+        note: "Copia di associazione di categoria, NON fonte ufficiale (inclusa solo come ripiego testuale, 9 pagine con corpo e rinvii agli allegati). Preferire GU/MIT. La pagina MIT 'Decreto interministeriale n. 15 del 16.01.2017' (mit.gov.it/normativa/decreto-interministeriale-n-15-del-16012017) e risultata non apribile: errore certificato SSL."
+      - titolo: "D.Lgs. 19 agosto 2005, n. 192 - Rendimento energetico nell'edilizia (APE)"
+        ente: "Normattiva"
+        livello: nazionale
+        ambito: entrambi
+        tipo: decreto
+        url: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:2005-08-19;192"
+        formato: html
+        data_documento: "2005-08-19 (aggiornato a atto del 2025-12-05)"
+        aggiornamento_atteso: "moderato (recepimento direttive UE EPBD 2024)"
+        verificato: "si"
+        note: "Pagina aperta, HTML. Testo dell'art. 6 (APE in contratti di locazione) non letto nell'estrazione: verificare con URN ~art6. Conferma indiretta dall'AdE: clausola APE nel contratto e allegato APE (eccetto singole unita)."
+      - titolo: "ISTAT - Indice dei prezzi al consumo per le rivalutazioni monetarie (FOI)"
+        ente: "ISTAT"
+        livello: nazionale
+        ambito: lungo-termine
+        tipo: dati
+        url: "https://www.istat.it/notizia/indice-dei-prezzi-per-le-rivalutazioni-monetarie/"
+        formato: html
+        data_documento: "2026-10-16 (rif. settembre 2026; prossima 2026-11-17)"
+        aggiornamento_atteso: "mensile"
+        verificato: "si"
+        note: "HTML renderizzato lato server, valori FOI (base 2025=100) nel testo; tabelle/coefficienti scaricabili in xlsx/pdf e calcolatore rivaluta.istat.it (applicazione esterna, probabile JS)."
+
+  - id: regione-emilia-romagna
+    descrizione: "Emilia-Romagna: L.R. 16/2004, CIR/CIN, locazioni turistiche, circolari regionali, Ross1000."
+    voci:
+      - titolo: "L.R. 28 luglio 2004, n. 16 - Disciplina delle strutture ricettive dirette all'ospitalita (art. 35-bis CIR, art. 12 appartamenti)"
+        ente: "Regione Emilia-Romagna (Demetra)"
+        livello: regionale
+        ambito: affitti-brevi
+        tipo: legge
+        url: "https://demetra.regione.emilia-romagna.it/al/articolo?urn=er:assemblealegislativa:legge:2004;16"
+        formato: html
+        data_documento: "2004-07-28"
+        aggiornamento_atteso: raro
+        verificato: "no"
+        note: "URL citato dalla pagina regionale 'normativa appartamenti' ma l'apertura ha fatto redirect 302 a paginedicortesia.regione.emilia-romagna.it/down.html (sito in manutenzione/giu al momento). Riprovare; testo vigente atteso su Demetra."
+      - titolo: "Regione E-R - Normativa appartamenti ammobiliati per uso turistico (elenco L.R. 16/2004, DGR 2186/2005, 802/2007, 687/2023, 1270/2023)"
+        ente: "Regione Emilia-Romagna - Turismo"
+        livello: regionale
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://imprese.regione.emilia-romagna.it/turismo/ambiti/appartamenti-ammobiliati-per-uso-turistico/appartamenti-ammobiliati-per-uso-turistico/normativa-appartamenti-ammobiliati-per-uso-turistico"
+        formato: html
+        data_documento: sconosciuta
+        aggiornamento_atteso: "occasionale"
+        verificato: "si"
+        note: "Pagina indice con link ai PDF delle DGR (servizissiir.regione.emilia-romagna.it ... codProtocollo=GPG/2023/636 per la DGR 687/2023 e GPG/2023/1296 per la 1270/2023, link non aperti individualmente)."
+      - titolo: "Codice identificativo di riferimento (CIR) - DGR 687/2023 e 1270/2023"
+        ente: "Regione Emilia-Romagna - Turismo"
+        livello: regionale
+        ambito: affitti-brevi
+        tipo: delibera
+        url: "https://imprese.regione.emilia-romagna.it/turismo/ambiti/documenti/codice-identificativo-di-riferimento"
+        formato: html
+        data_documento: "2023-05-04 (pagina agg. 2026-04-08)"
+        aggiornamento_atteso: raro
+        verificato: "si"
+        note: "Pagina non menziona Ross1000 ne guide. Link ai testi DGR sul database della Giunta."
+      - titolo: "Circolare in materia di CIN e CIR (prot. 951915)"
+        ente: "Regione Emilia-Romagna - Settore Turismo, Commercio, Economia urbana, Sport"
+        livello: regionale
+        ambito: affitti-brevi
+        tipo: delibera
+        url: "https://imprese.regione.emilia-romagna.it/turismo/ambiti/documenti/circolare-in-materia-di-cin-e-cir"
+        formato: html
+        data_documento: "2024-09-05"
+        aggiornamento_atteso: raro
+        verificato: "si"
+        note: "Scheda HTML della circolare; il PDF e allegato (url PDF: .../documenti/circolare-cin.pdf/@@download/file/circolare%20Cin.pdf, non aperto). Dal 2024-11-02 il CIN sostituisce il CIR nelle attivita promozionali (da pagina regionale)."
+      - titolo: "Modifiche alla disciplina delle locazioni brevi e turistiche non imprenditoriali (L. 199/2025) - circolare prot. 72284 del 4 febbraio 2026"
+        ente: "Regione Emilia-Romagna - Settore Turismo, Commercio, Economia urbana, Sport"
+        livello: regionale
+        ambito: affitti-brevi
+        tipo: delibera
+        url: "https://imprese.regione.emilia-romagna.it/turismo/ambiti/appartamenti-ammobiliati-per-uso-turistico/modifiche-alla-disciplina-delle-locazioni-brevi-e-turistiche-non-imprenditoriali"
+        formato: html
+        data_documento: "2026-02-04 (pagina agg. 2026-04-08)"
+        aggiornamento_atteso: occasionale
+        verificato: "si"
+        note: "Il PDF della circolare (.../documenti/circolare_numero_massimo_appartamenti.pdf/@@download/file) e stato scaricato e letto: massimo 2 appartamenti in forma non imprenditoriale dal 2026-01-01, oltre SCIA (FAQ 7.2 BDSR)."
+      - titolo: "Ross1000 - Manuale profilo albergatore, inserimento clienti"
+        ente: "Regione Emilia-Romagna - Statistica"
+        livello: regionale
+        ambito: affitti-brevi
+        tipo: manuale
+        url: "https://statistica.regione.emilia-romagna.it/documentazione/rilevazioni/turismo/allegati-rilevazioni-turismo/manuali-e-tracciati-rilevazioni-turismo/manuale-ross1000-inserimento-clienti.pdf"
+        formato: pdf
+        data_documento: sconosciuta
+        aggiornamento_atteso: "occasionale"
+        verificato: "si"
+        note: "Aperta la pagina regionale 'Manuale Ross1000 - Profilo Albergatore - Inserimento clienti' (il PDF collegato, 'Profilo struttura - Caricamento manuale', non e stato aperto; l'URL .pdf indicato qui e quello del risultato di ricerca). E un manuale per la struttura ricettiva, non specifico per locazioni turistiche. Non trovata una fonte regionale ufficiale sull'obbligo statistico per le locazioni turistiche (solo blog commerciali)."
+
+  - id: regione-valle-aosta
+    descrizione: "Valle d'Aosta: L.R. 11/2023 locazioni turistiche (CIR dal Comune via piattaforma), L.R. 10/2023 imposta di soggiorno, FAQ BDSR/CIN, tariffe."
+    voci:
+      - titolo: "Locazioni turistiche - Regione Autonoma Valle d'Aosta (L.R. 11/2023, piattaforma, manuali, FAQ)"
+        ente: "Regione Autonoma Valle d'Aosta - Assessorato turismo"
+        livello: regionale
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://www.regione.vda.it/asstur/locazioni_turistiche/default_i.aspx"
+        formato: html
+        data_documento: "FAQ agg. 2026-01-30"
+        aggiornamento_atteso: frequente
+        verificato: "si"
+        note: "Pagina indice di LR 11/2023, FAQ, manuale utente piattaforma V6, tariffe imposta locazioni turistiche per Comune. La piattaforma locazionituristiche.regione.vda.it richiede SPID/CIE/CNS (login, non scaricabile)."
+      - titolo: "Legge regionale 18 luglio 2023, n. 11 - Disciplina degli adempimenti amministrativi in materia di locazioni brevi per finalita turistiche (testo vigente)"
+        ente: "Consiglio Regionale Valle d'Aosta"
+        livello: regionale
+        ambito: affitti-brevi
+        tipo: legge
+        url: "https://www.consiglio.vda.it/app/leggieregolamenti/dettaglio?pk_lr=10602"
+        formato: html
+        data_documento: "2023-07-18 (in vigore 2023-11-01)"
+        aggiornamento_atteso: raro
+        verificato: "no"
+        note: "WebFetch: 'unable to verify the first certificate' (errore SSL del sito del Consiglio). Pagina identificata via ricerca come 'Legge regionale 18 luglio 2023, n. 11 - Testo vigente'. Alternativa: PDF LR 11/2023 linkato dalla pagina regione.vda.it (allegato.aspx?pk=..., pk non identificato)."
+      - titolo: "FAQ applicazione art. 13-ter DL 145/2023 (BDSR e CIN) - alloggi ad uso turistico"
+        ente: "Regione Autonoma Valle d'Aosta - S.O. Strutture ricettive e commercio"
+        livello: regionale
+        ambito: affitti-brevi
+        tipo: faq
+        url: "https://www.regione.vda.it/allegato.aspx?pk=115222"
+        formato: pdf
+        data_documento: "2026-04-01 (data file)"
+        aggiornamento_atteso: frequente
+        verificato: "si"
+        note: "PDF 6 pagine letto: FAQ BDSR/CIN con aggiornamenti evidenziati in giallo. (Il pk 115223 della stessa famiglia non e stato aperto; nei risultati di ricerca compare anche pk=115222 in versione gestionewww.)"
+      - titolo: "Legge regionale 18 luglio 2023, n. 10 - Disciplina dell'imposta di soggiorno (testo vigente)"
+        ente: "Consiglio Regionale Valle d'Aosta"
+        livello: regionale
+        ambito: entrambi
+        tipo: legge
+        url: "https://www.regione.vda.it/allegato.aspx?pk=103785"
+        formato: pdf
+        data_documento: "2023-07-18 (in vigore 2024-05-01)"
+        aggiornamento_atteso: raro
+        verificato: "si"
+        note: "PDF 'Legge regionale 18 luglio 2023, n. 10 - Testo vigente' (letto da pdftotext)."
+      - titolo: "Imposta di soggiorno - Regione VdA (LR 10/2023, DGR 1534/2024, FAQ, tariffe per struttura e per locazioni turistiche)"
+        ente: "Regione Autonoma Valle d'Aosta - Assessorato turismo"
+        livello: regionale
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://www.regione.vda.it/asstur/Imposta_soggiorno/default_i.aspx"
+        formato: html
+        data_documento: "2026-10-16 (pagina)"
+        aggiornamento_atteso: "annuale (tariffe 1 maggio - 30 aprile)"
+        verificato: "si"
+        note: "Pagina indice: DGR 1534/2024 (pk=104992, non aperta: HTTP 503), FAQ (pk=117669), tariffe locazioni turistiche per Comune (pk=112686). Scadenze dichiarazione: 30 settembre (gen-giu), 31 gennaio (lug-dic)."
+      - titolo: "Tariffe imposta di soggiorno dal 1 maggio 2026 al 30 aprile 2027 - per struttura e Comune (include Pre-Saint-Didier)"
+        ente: "Regione Autonoma Valle d'Aosta"
+        livello: regionale
+        ambito: affitti-brevi
+        tipo: dati
+        url: "https://www.regione.vda.it/allegato.aspx?pk=116597"
+        formato: pdf
+        data_documento: "validita 2026-05-01 / 2027-04-30"
+        aggiornamento_atteso: annuale
+        verificato: "si"
+        note: "PDF letto con pdftotext: tabella per Comune con righe Pre-Saint-Didier; stesso formato anno precedente: pk=117437 (validita 2025-05-01/2026-04-30). Le righe contengono tariffe alta e bassa stagione; il Comune puo maggiorare fino al 50%."
+      - titolo: "Tariffe imposta di soggiorno - locazioni turistiche per Comune (VdA)"
+        ente: "Regione Autonoma Valle d'Aosta"
+        livello: regionale
+        ambito: affitti-brevi
+        tipo: dati
+        url: "https://www.regione.vda.it/allegato.aspx?pk=112686"
+        formato: pdf
+        data_documento: sconosciuta
+        aggiornamento_atteso: annuale
+        verificato: "no"
+        note: "Collegamento ricavato dalla pagina indice (URL ricostruito dai link relativi); non aperto singolarmente."
+      - titolo: "Statistiche presenze/ISTAT per strutture ricettive VdA - obbligo di comunicazione per locazioni turistiche (dichiarazione ISTAT)"
+        ente: "Regione Autonoma Valle d'Aosta"
+        livello: regionale
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "sconosciuto"
+        formato: altro
+        data_documento: sconosciuta
+        aggiornamento_atteso: frequente
+        verificato: "no"
+        note: "Non trovata una pagina ufficiale con l'obbligo. La pagina 'Locazioni turistiche' cita video tutorial 'dichiarazione presenze ISTAT' e contatto supporto.istat@regione.vda.it (0165.275602): da approfondire dentro la piattaforma (login)."
+
+  - id: regione-toscana
+    descrizione: "Toscana: L.R. 61/2024 (Testo unico turismo), regolamento 47/R/2025, MOtourist Office/CIR, poteri dei comuni sulle locazioni brevi."
+    voci:
+      - titolo: "Regione Toscana - Il nuovo Testo unico del turismo e il Regolamento di attuazione"
+        ente: "Regione Toscana"
+        livello: regionale
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://www.regione.toscana.it/-/il-nuovo-testo-unico-del-turismo-e-il-regolamento-di-attuazione"
+        formato: html
+        data_documento: "2026-06-11 (agg.)"
+        aggiornamento_atteso: occasionale
+        verificato: "si"
+        note: "Pagina di sintesi con link a legge, regolamento e sentenza Corte costituzionale 196/2025."
+      - titolo: "L.R. 31 dicembre 2024, n. 61 - Testo unico del turismo (testo coordinato; Titolo III Locazioni turistiche, art. 59-61)"
+        ente: "Consiglio regionale Toscana - Raccolta normativa"
+        livello: regionale
+        ambito: affitti-brevi
+        tipo: legge
+        url: "https://raccoltanormativa.consiglio.regione.toscana.it/articolo?urndoc=urn:nir:regione.toscana:legge:2024-12-31;61"
+        formato: html
+        data_documento: "2024-12-31 (ultima modifica indicata: L.R. 16 giugno 2026, n. 9)"
+        aggiornamento_atteso: "frequente (testo coordinato aggiornato a ogni modifica)"
+        verificato: "si"
+        note: "Pagina HTML 'Testo coordinato' (non ufficiale; vale il BURT). L'estrazione ha dato indice e note, non il corpo degli articoli: potrebbe caricare il testo con JS o in fragment. Disponibili download PDF/XML (Akoma Ntoso): il PDF e raggiungibile da download_doc.php?id=...&ext=pdf (es. id 5219d4f2-d4f0-11ef-b084-005056959b60 e' la versione originale, non il coordinato). Corte cost. n. 186/2025 ha respinto le questioni su art. 59."
+      - titolo: "DPGR 11 agosto 2025, n. 47/R - Regolamento di attuazione della L.R. 61/2024"
+        ente: "Consiglio regionale Toscana - Raccolta normativa"
+        livello: regionale
+        ambito: affitti-brevi
+        tipo: regolamento
+        url: "https://raccoltanormativa.consiglio.regione.toscana.it/articolo?urndoc=urn:nir:regione.toscana:regolamento.giunta:2025-08-11;47/R"
+        formato: html
+        data_documento: "2025-08-11 (BURT 2025-08-14, in vigore 2025-08-29)"
+        aggiornamento_atteso: occasionale
+        verificato: "si"
+        note: "Identificato (indice: 6 titoli, allegati A-J). Dall'indice il regolamento riguarda soprattutto strutture ricettive, stabilimenti balneari e professioni: NON risulta disciplinare le locazioni turistiche (che sono in L.R. artt. 59-61). Corpo articoli non letto."
+      - titolo: "MOtourist Office Toscana - registrazione per comunicazione locazioni turistiche (CIR, flussi statistici)"
+        ente: "Regione Toscana (gestito dal Comune di Follonica dal 2026)"
+        livello: regionale
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://toscana.motouristoffice.it/lt_registrazione.php"
+        formato: html
+        data_documento: sconosciuta
+        aggiornamento_atteso: frequente
+        verificato: "si"
+        note: "Pagina di registrazione (codice fiscale, password): serve account, contenuti informativi limitati. Dal PDF del Comune di Castiglione: il portale rilascia il CIR necessario per ottenere il CIN. Non trovata documentazione normativa/manuale ufficiale pubblica sulla comunicazione statistica (Turismo5/MOtourist)."
+      - titolo: "Portale CIR/CIN Regione Toscana (pagina regionale su locazioni turistiche) - non individuata"
+        ente: "Regione Toscana"
+        livello: regionale
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "sconosciuto"
+        formato: html
+        data_documento: sconosciuta
+        aggiornamento_atteso: frequente
+        verificato: "no"
+        note: "La Questura di Grosseto rimanda a una pagina Regione Toscana sulle locazioni turistiche, ma l'URL non e stato ricavato; la ricerca non ha dato una pagina regionale ufficiale dedicata."
+
+  - id: comune-bologna
+    descrizione: "Bologna: imposta di soggiorno (regolamento, tariffe 2026, adempimenti), accordo territoriale canone concordato (Citta metropolitana)."
+    voci:
+      - titolo: "DG/PRO/2025/283 - Approvazione delle tariffe 2026 per l'imposta di soggiorno"
+        ente: "Comune di Bologna"
+        livello: comunale
+        ambito: affitti-brevi
+        tipo: delibera
+        url: "https://www.comune.bologna.it/myportal/C_A944/api/content/download?id=660532c5ca8004009ad9519a"
+        formato: pdf
+        data_documento: "2025-12-09"
+        aggiornamento_atteso: annuale
+        verificato: "si"
+        note: "PDF letto con pdftotext. Fasce 4,00 / 5,80 / 6,50 / 7,00 EUR, campeggi e ostelli 2,80; 10,5% (max 7 EUR) per piattaforme/intermediari su locazioni brevi. Cita il Regolamento PG 528563/2020 modificato con delibera Consiglio PG 848364/2024. URL con id opaco: stabile solo finche il Comune non sostituisce il file."
+      - titolo: "Imposta di soggiorno, approvato l'adeguamento tariffario per il 2025 (comunicato)"
+        ente: "Comune di Bologna - Ufficio stampa"
+        livello: comunale
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://www.comune.bologna.it/novita/comunicati-stampa/imposta-di-soggiorno-approvato-ladeguamento-tariffario-il-2025"
+        formato: html
+        data_documento: "2024-12-04 (agg. 2026-02-02)"
+        aggiornamento_atteso: annuale
+        verificato: "si"
+        note: "Contesto storico delle tariffe giubilari (aprile-dicembre 2025); utile come cronologia, non come norma."
+      - titolo: "Regolamento dell'imposta di soggiorno nel Comune di Bologna (consolidato 2015)"
+        ente: "Comune di Bologna"
+        livello: comunale
+        ambito: affitti-brevi
+        tipo: regolamento
+        url: "https://archivio-notizie.comune.bologna.it/wp-content/uploads/2015/04/Regolamento_Imposta_Soggiorno.pdf"
+        formato: pdf
+        data_documento: "2015-04 (OdG 174/2012, mod. 2013 e 2015)"
+        aggiornamento_atteso: "SUPERATO"
+        verificato: "si"
+        note: "PDF aperto ma NON vigente: la delibera 2026 cita un regolamento diverso (PG 528563/2020, modificato 25/11/2024). Sconsigliato per l'archivio; serve il testo vigente (non trovato)."
+      - titolo: "Regolamento dell'imposta di soggiorno vigente (PG 528563/2020 e ss.mm.ii., mod. 2024-11-25)"
+        ente: "Comune di Bologna"
+        livello: comunale
+        ambito: affitti-brevi
+        tipo: regolamento
+        url: "sconosciuto"
+        formato: pdf
+        data_documento: "2024-11-25 (ultima modifica)"
+        aggiornamento_atteso: raro
+        verificato: "no"
+        note: "Non trovato l'URL del testo vigente. Le pagine comune.bologna.it/tasse/servizi/15:13312/... sono apparse restituire altro contenuto/licenza CC, non il regolamento. Provare l'albo/delibere sul sito del Comune."
+      - titolo: "Tassa di soggiorno - Bologna Welcome (tariffe 2026, DG/PRO/2025/283)"
+        ente: "Bologna Welcome (sito ufficiale di informazione turistica)"
+        livello: comunale
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://www.bolognawelcome.com/it/informazioni/tassa-di-soggiorno"
+        formato: html
+        data_documento: "agg. 2026-07-20"
+        aggiornamento_atteso: annuale
+        verificato: "si"
+        note: "Sito turistico, non del Comune: serve solo come riscontro. Tariffe coerenti con la delibera 2026. Dichiarazione dei gestori tramite portale GEIS (trimestrale entro 15 giorni; annuale entro 30 giugno) - dato da fonte secondaria, non verificato su sito del Comune."
+      - titolo: "Accordo territoriale Bologna - contratti a canone concordato (Citta metropolitana di Bologna) - accordo 2024"
+        ente: "Citta metropolitana di Bologna"
+        livello: comunale
+        ambito: lungo-termine
+        tipo: accordo-territoriale
+        url: "https://www.cittametropolitana.bo.it/sanitasociale/politiche_abitative/collaborazioni_progetti_eventi_risorse_online/politiche_abitative_canone_concordato"
+        formato: html
+        data_documento: "2024-04-01 (validita fino al 2027-03-31 da fonti secondarie)"
+        aggiornamento_atteso: "triennale"
+        verificato: "no"
+        note: "Pagina trovata da ricerca; l'apertura della pagina e del PDF dell'accordo (https://www.cittametropolitana.bo.it/portale/Engine/RAServeFile.php/f/ACCORDO_2024_ULTIMA_VERSIONE.pdf) ha restituito HTTP 403 (probabile blocco anti-bot). Testo dell'accordo non letto. Validita da fonti secondarie."
+      - titolo: "Regolamento comunale sulle locazioni brevi/turistiche a Bologna (limiti o requisiti)"
+        ente: "Comune di Bologna"
+        livello: comunale
+        ambito: affitti-brevi
+        tipo: delibera
+        url: "sconosciuto"
+        formato: altro
+        data_documento: sconosciuta
+        aggiornamento_atteso: sconosciuto
+        verificato: "no"
+        note: "Cercata ma non trovata alcuna delibera comunale su limiti alle locazioni brevi. In E-R i poteri sono limitati (L.R. 16/2004 e modifiche): da verificare se esistono atti recenti."
+
+  - id: comune-pre-saint-didier
+    descrizione: "Pre-Saint-Didier (AO): imposta di soggiorno (regole regionali + eventuale maggiorazione comunale), accordo canone concordato, nessun atto comunale individuato."
+    voci:
+      - titolo: "Comune di Pre-Saint-Didier - sito istituzionale (sezioni tributi, servizi, turismo)"
+        ente: "Comune di Pre-Saint-Didier"
+        livello: comunale
+        ambito: entrambi
+        tipo: pagina-aiuto
+        url: "https://www.comune.pre-saint-didier.ao.it/"
+        formato: html
+        data_documento: sconosciuta
+        aggiornamento_atteso: frequente
+        verificato: "si"
+        note: "Home aperta. Le categorie 'Tributi, finanze e contravvenzioni' e 'Turismo' (/servizi-categoria/...) mostrano '0 servizi trovati' nell'estrazione: contenuto probabilmente caricato via JS o assente. Nessuna pagina sull'imposta di soggiorno individuata; tel. 0165 86 87 11."
+      - titolo: "Regolamento comunale per l'attuazione dell'imposta di soggiorno (Pre-Saint-Didier)"
+        ente: "Comune di Pre-Saint-Didier"
+        livello: comunale
+        ambito: affitti-brevi
+        tipo: regolamento
+        url: "http://www.comune.pre-saint-didier.ao.it/datapage.asp?id=161&l=1"
+        formato: html
+        data_documento: sconosciuta
+        aggiornamento_atteso: raro
+        verificato: "no"
+        note: "Pagina 'Ufficio tributi' (vecchio sito) emersa da ricerca e riportata come link a un 'Regolamento comunale per l'attuazione dell'imposta di soggiorno', ma WebFetch ha dato HTTP 404 (vecchio sito dismesso?). Regolamento non reperito."
+      - titolo: "Tariffe imposta di soggiorno VdA 2026-27 e 2025-26 (righe Pre-Saint-Didier) - vedi regione-valle-aosta"
+        ente: "Regione Autonoma Valle d'Aosta"
+        livello: regionale
+        ambito: affitti-brevi
+        tipo: dati
+        url: "https://www.regione.vda.it/allegato.aspx?pk=117437"
+        formato: pdf
+        data_documento: "validita 2025-05-01 / 2026-04-30"
+        aggiornamento_atteso: annuale
+        verificato: "si"
+        note: "Annuale 2025-26 verificato (riga Pre-Saint-Didier presente, 16 pagine, Excel esportato in PDF). Per 2026-27 vedi pk=116597. Il Comune puo aver deciso maggiorazione propria: atto non trovato."
+      - titolo: "Accordo territoriale canone concordato Valle d'Aosta/Aosta (Comune di Aosta, 17 gennaio 2020)"
+        ente: "Comune di Aosta (+ associazioni)"
+        livello: comunale
+        ambito: lungo-termine
+        tipo: accordo-territoriale
+        url: "https://www.comune.aosta.it/it/public_documents/attestazione-di-rispondenza-canone-concordato"
+        formato: pdf
+        data_documento: "2020-01-17"
+        aggiornamento_atteso: "triennale"
+        verificato: "si"
+        note: "Aperta solo la scheda dell'attestazione di rispondenza (Ufficio IMU; PDF modulo), NON il testo dell'accordo. L'accordo riguarda il solo Comune di Aosta: per Pre-Saint-Didier non risulta un accordo locale (senza accordo vale il contratto ponte/DM 16/01/2017). Notizia CELVA sull'accordo 2019 (celva.it ...nuovi-accordi-territoriali-aosta-2019/) restituisce 404."
+
+  - id: comune-castiglione-pescaia
+    descrizione: "Castiglione della Pescaia (GR): imposta di soggiorno (regolamento, tariffe 2026), adempimenti locazioni brevi, accordo canone concordato (Grosseto)."
+    voci:
+      - titolo: "Documenti relativi imposta di soggiorno - Comune di Castiglione della Pescaia (indice)"
+        ente: "Comune di Castiglione della Pescaia - Ufficio tributi"
+        livello: comunale
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://www.comune.castiglionedellapescaia.gr.it/it/documenti_pubblici/documenti-relativi-imposta-di-soggiorno"
+        formato: html
+        data_documento: "pagina agg. 2026-07-28"
+        aggiornamento_atteso: "annuale"
+        verificato: "si"
+        note: "Indice di 8 PDF: adempimenti locazioni turistiche brevi (dal 2026-06-26), tariffe 2026, tariffe 2025, regolamento 2025, moduli Staytour/esenzione."
+      - titolo: "Deliberazione Giunta n. 358 del 20/11/2025 - Tariffe imposta di soggiorno anno 2026"
+        ente: "Comune di Castiglione della Pescaia"
+        livello: comunale
+        ambito: affitti-brevi
+        tipo: delibera
+        url: "https://www.comune.castiglionedellapescaia.gr.it/s3/1791/allegati/modulistica/imposta-di-soggirono/tariffe-2026.pdf"
+        formato: pdf
+        data_documento: "2025-11-20"
+        aggiornamento_atteso: annuale
+        verificato: "si"
+        note: "PDF letto: delibera di Giunta n. 358/2025. Tariffe confermate 2025 (da sintesi di ricerca: alberghi da 1,20 a 5,00 EUR, affitti uso turistico 1,00 EUR; non verificato nel testo)."
+      - titolo: "Regolamento imposta di soggiorno - Castiglione della Pescaia (Consiglio n. 7/2022, mod. n. 110/2022 e n. 9/2024)"
+        ente: "Comune di Castiglione della Pescaia"
+        livello: comunale
+        ambito: affitti-brevi
+        tipo: regolamento
+        url: "https://old.comune.castiglionedellapescaia.gr.it/wp-content/uploads/2022/03/REGOLAMENTO-IMPOSTA-DI-SOGGIORNO-2024.pdf"
+        formato: pdf
+        data_documento: "2024-03-04"
+        aggiornamento_atteso: raro
+        verificato: "si"
+        note: "PDF letto (intestazione e indice). Esiste una versione piu recente sul sito nuovo: 'regolamento-imposta-di-soggiorno-2025.pdf' (https://municipium-images-production.s3-eu-west-1.amazonaws.com/s3/1791/allegati/modulistica/imposta-di-soggirono/regolamento-imposta-di-soggiorno-2025.pdf), non aperta: preferire quella. Periodo di applicazione 1 aprile-31 ottobre, max 14 notti (testo 2024)."
+      - titolo: "Adempimenti ai fini delle locazioni turistiche brevi (dal 26-06-2026)"
+        ente: "Comune di Castiglione della Pescaia"
+        livello: comunale
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://www.comune.castiglionedellapescaia.gr.it/s3/1791/allegati/condizioni-di-servizio/adempimenti-locazioni-turistiche-brevi-dal-26-06-2026.pdf"
+        formato: pdf
+        data_documento: "2026-06-26"
+        aggiornamento_atteso: "frequente"
+        verificato: "no"
+        note: "URL dall'indice del Comune, NON aperto. E stata aperta e letta la versione precedente (pagamentipa.comune.castiglionedellapescaia.gr.it/s3/1791/allegati/modulistica/imposta-di-soggirono/adempimenti-locazioni-turistiche-brevi.pdf, 2026-04-10): Alloggiati Web, portale MOtourist (CIR), BDSR, registrazione Staytour. Preferire la versione 2026-06-26."
+      - titolo: "Staytour - portale imposta di soggiorno Castiglione della Pescaia"
+        ente: "Comune di Castiglione della Pescaia / Hyksos srl"
+        livello: comunale
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://imposta-soggiorno.org/castiglionedellapescaia/"
+        formato: html
+        data_documento: sconosciuta
+        aggiornamento_atteso: n/a
+        verificato: "si"
+        note: "Pagina di LOGIN (SPID/CIE) per i gestori: nessun contenuto informativo. Non scaricabile: solo link da documentare."
+      - titolo: "Accordo territoriale canone concordato - Castiglione della Pescaia / provincia di Grosseto (accordo quadro Comune di Grosseto 25/7/2025)"
+        ente: "Comune di Grosseto"
+        livello: comunale
+        ambito: lungo-termine
+        tipo: accordo-territoriale
+        url: "https://www.comune.grosseto.it/app/uploads/2025/08/Accordo-quadro-territoriale-Comune-di-Grosseto-25_7_2025.pdf"
+        formato: pdf
+        data_documento: "2025-07-25 (notizia 2025-08-05)"
+        aggiornamento_atteso: "triennale"
+        verificato: "si"
+        note: "PDF raggiungibile ma e una SCANSIONE (una immagine per pagina): serve OCR. Riguarda il Comune di Grosseto, non Castiglione. Per Castiglione risulta un accordo depositato il 27/12/2003 (prot. 1283 del 2004-01-14), citato nei bandi comunali 2016/2017: stato attuale sconosciuto; accordo specifico non trovato."
+      - titolo: "Delibere comunali su limiti/requisiti per locazioni brevi (Castiglione della Pescaia)"
+        ente: "Comune di Castiglione della Pescaia"
+        livello: comunale
+        ambito: affitti-brevi
+        tipo: delibera
+        url: "sconosciuto"
+        formato: altro
+        data_documento: sconosciuta
+        aggiornamento_atteso: sconosciuto
+        verificato: "no"
+        note: "Non trovata alcuna delibera. L'art. 59 L.R. 61/2024 consente limiti solo ai comuni ad alta densita turistica/capoluoghi: appartenenza di Castiglione non verificata."
+
+  - id: piattaforme-affitti-brevi
+    descrizione: "Pagine di aiuto di Airbnb e Booking.com per l'Italia (ritenuta 21%, comunicazioni, CIN, imposta di soggiorno)."
+    voci:
+      - titolo: "Panoramica riguardante le ritenute fiscali sul reddito per gli host in Italia (Airbnb Help article 3527)"
+        ente: "Airbnb"
+        livello: piattaforma
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://www.airbnb.it/help/article/3527"
+        formato: html
+        data_documento: sconosciuta
+        aggiornamento_atteso: frequente
+        verificato: "si"
+        note: "Versione italiana aperta (titolo 'Panoramica riguardante le ritenute fiscali sul reddito per gli host in Italia'); su .com risulta in inglese. Contenuto: ritenuta 21% su soggiorni fino a 30 notti per host non professionali. Possibile rendering lato client."
+      - titolo: "Italy Tax Withholding Data Collection / Raccolta dati per la ritenuta in Italia (Airbnb Help article 3641)"
+        ente: "Airbnb"
+        livello: piattaforma
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://www.airbnb.com/help/article/3641"
+        formato: html
+        data_documento: sconosciuta
+        aggiornamento_atteso: frequente
+        verificato: "si"
+        note: "Aperto su .com (inglese): dati richiesti per la CU (codice fiscale, dati catastali, codici comune; scadenza febbraio). Versione italiana: provare airbnb.it/help/article/3641 (non verificato)."
+      - titolo: "Responsible hosting in Italy / Ospitare responsabilmente in Italia (Airbnb Help article 1394)"
+        ente: "Airbnb"
+        livello: piattaforma
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://www.airbnb.com/help/article/1394"
+        formato: html
+        data_documento: sconosciuta
+        aggiornamento_atteso: frequente
+        verificato: "si"
+        note: "Aperto su .com (inglese): obblighi host Italia (Alloggiati Web, CIN dal 2025-01-02, ritenuta, dispositivi sicurezza). Versione italiana non verificata."
+      - titolo: "Tourist tax collection and remittance by Airbnb in Italy (Airbnb Help article 2287)"
+        ente: "Airbnb"
+        livello: piattaforma
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://www.airbnb.com/help/article/2287"
+        formato: html
+        data_documento: sconosciuta
+        aggiornamento_atteso: frequente
+        verificato: "si"
+        note: "Aperto su .com (inglese): comuni coperti, quando l'host resta responsabile, dati ATECO. Versione italiana non verificata."
+      - titolo: "Tourist Tax Collection in Italy (Airbnb Help article 3652)"
+        ente: "Airbnb"
+        livello: piattaforma
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://www.airbnb.com/help/article/3652"
+        formato: html
+        data_documento: sconosciuta
+        aggiornamento_atteso: frequente
+        verificato: "si"
+        note: "Aperto su .com (inglese): raccolta graduale dell'imposta di soggiorno dopo la Legge di Bilancio 2024. Ridondante con 2287: tenere una delle due."
+      - titolo: "Aosta Valley (Valle d'Aosta), Italy - requisiti regionali per host (Airbnb Help article 3701)"
+        ente: "Airbnb"
+        livello: piattaforma
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://www.airbnb.com/help/article/3701"
+        formato: html
+        data_documento: sconosciuta
+        aggiornamento_atteso: frequente
+        verificato: "si"
+        note: "Aperto (inglese): requisiti VdA, notifica al Comune, CIR, dati turistici mensili. Non verificate pagine analoghe per Emilia-Romagna e Toscana."
+      - titolo: "Airbnb dal 2025 rimuovera gli annunci sprovvisti di CIN (comunicato)"
+        ente: "Airbnb Italia (newsroom)"
+        livello: piattaforma
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://news.airbnb.com/it/airbnb-dal-2025-rimuovera-gli-annunci-sprovvisti-di-cin"
+        formato: html
+        data_documento: "2024-11-20"
+        aggiornamento_atteso: raro
+        verificato: "si"
+        note: "Comunicato stampa: valore storico, non guida operativa."
+      - titolo: "Airbnb - Italia: considerazioni fiscali sulle locazioni brevi (guida 2024 a cura di studio legale indipendente)"
+        ente: "Airbnb (guida di terzi)"
+        livello: piattaforma
+        ambito: affitti-brevi
+        tipo: manuale
+        url: "https://assets.airbnb.com/help/AirbnbTaxGuide2024_Italy_ITALIAN.pdf"
+        formato: pdf
+        data_documento: "2024-05"
+        aggiornamento_atteso: "annuale (probabile versione piu recente)"
+        verificato: "si"
+        note: "PDF in italiano letto da pdftotext (intestazione): guida di uno studio legale terzo, maggio 2024; potrebbe essere superata. Cercare edizioni piu recenti."
+      - titolo: "Booking.com - Trattenuta delle imposte per gli affitti a breve termine dei partner"
+        ente: "Booking.com"
+        livello: piattaforma
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://partner.booking.com/it/aiuto/commissioni-fatture-e-tasse/tasse-locali/informazioni-sulla-trattenuta-delle-imposte-gli"
+        formato: html
+        data_documento: sconosciuta
+        aggiornamento_atteso: frequente
+        verificato: "no"
+        note: "WebFetch: HTTP 403. Contenuto noto solo dal riassunto della ricerca (21% su soggiorni fino a 30 notti, 1-4 unita, certificato annuale). Anche partner.booking.com/it/bookingcom-partner-hub-home-it ha dato 403: dominio bloccato per crawler semplici, probabile necessita di browser/JS."
+      - titolo: "Booking.com - Understanding short-term rentals (pagina legale per i partner)"
+        ente: "Booking.com"
+        livello: piattaforma
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://partner.booking.com/en-us/help/legal-security/terms-local-laws/understanding-short-term-rentals"
+        formato: html
+        data_documento: sconosciuta
+        aggiornamento_atteso: frequente
+        verificato: "no"
+        note: "Trovato da ricerca, non aperto; in inglese e generico (non solo Italia). Non trovata una pagina Booking in italiano su imposta di soggiorno/CIN in Italia."
+
+  - id: servizi-pa
+    descrizione: "Portali e manuali PA: Alloggiati Web (Polizia di Stato), BDSR/CIN, RLI web e istruzioni modello RLI (Agenzia delle Entrate), portali imposta di soggiorno."
+    voci:
+      - titolo: "Guida Servizio Alloggiati Web (manuale utente, 35 pagine)"
+        ente: "Polizia di Stato - Servizio Alloggiati Web"
+        livello: nazionale
+        ambito: affitti-brevi
+        tipo: manuale
+        url: "https://alloggiatiweb.poliziadistato.it/PortaleAlloggiati/Download/Manuali/MANUALEALBERGHI.pdf"
+        formato: pdf
+        data_documento: sconosciuta
+        aggiornamento_atteso: "occasionale"
+        verificato: "si"
+        note: "PDF letto con pdftotext: titolo interno 'GUIDA SERVIZIO ALLOGGIATI WEB' (autenticazione, inserimento schedine, invio file ...). Il nome file e fuorviante ('ALBERGHI'). Elenco ufficiale dei manuali: PortaleAlloggiati/SupManuali.aspx (l'estrazione ha mostrato solo il menu: lista documenti non letta)."
+      - titolo: "Alloggiati Web - FAQ"
+        ente: "Polizia di Stato"
+        livello: nazionale
+        ambito: affitti-brevi
+        tipo: faq
+        url: "https://alloggiatiweb.poliziadistato.it/PortaleAlloggiati/FAQ.aspx"
+        formato: html
+        data_documento: sconosciuta
+        aggiornamento_atteso: occasionale
+        verificato: "si"
+        note: "Pagina ASP.NET (probabile rendering server): FAQ su accesso, ricevute (conservare 5 anni), casi specifici. Altre pagine del portale: Normativa.aspx, Tabelle.aspx, SupManuali.aspx (non elencate: richiedono ulteriore verifica)."
+      - titolo: "Alloggiati Web - Il portale della Polizia di Stato (Questura di Grosseto)"
+        ente: "Questura di Grosseto - Polizia di Stato"
+        livello: nazionale
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://questure.poliziadistato.it/it/Grosseto/articolo/alloggiati"
+        formato: html
+        data_documento: "2026-07-21 (ultima modifica)"
+        aggiornamento_atteso: occasionale
+        verificato: "si"
+        note: "Pagina HTML. Credenziali tramite Questura competente: Grosseto per Castiglione della Pescaia. Per Bologna e Aosta (Pre-Saint-Didier) servono le rispettive Questure: pagine non cercate."
+      - titolo: "Alloggiati Web - portale di invio (accesso con credenziali)"
+        ente: "Polizia di Stato"
+        livello: nazionale
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://alloggiatiweb.poliziadistato.it/PortaleAlloggiati/SupManuali.aspx"
+        formato: html
+        data_documento: sconosciuta
+        aggiornamento_atteso: occasionale
+        verificato: "no"
+        note: "Pagina risponde, ma l'estrazione ha dato solo il menu (Manuali, Tabelle, Normativa, FAQ, Informazioni): l'elenco dei manuali non e stato letto. L'invio dati richiede login con credenziali Questura."
+      - titolo: "BDSR - portale Ministero del Turismo (richiesta CIN, ricerca CIN)"
+        ente: "Ministero del Turismo"
+        livello: nazionale
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://bdsr.ministeroturismo.gov.it/"
+        formato: html
+        data_documento: sconosciuta
+        aggiornamento_atteso: frequente
+        verificato: "no"
+        note: "Applicazione web (accesso SPID/CIE per 'Ottieni CIN'); l'estrazione ha dato solo il titolo 'CODICE IDENTIFICATIVO NAZIONALE' senza contenuto: probabile app JS (SPA, asset con hash). Esiste una pagina pubblica 'ricerca CIN' (/ricerca-cin) con stesso comportamento. Utile solo come link; i documenti scaricabili sono il Manuale (vedi nazionale-affitti-brevi)."
+      - titolo: "Modello RLI - Contratto di locazione o affitto di beni immobili: che cos'e (Agenzia delle Entrate)"
+        ente: "Agenzia delle Entrate"
+        livello: nazionale
+        ambito: lungo-termine
+        tipo: pagina-aiuto
+        url: "https://www.agenziaentrate.gov.it/portale/schede/fabbricatiterreni/registrazione-di-un-nuovo-contratto/schedainfo-regime-ordinario"
+        formato: html
+        data_documento: sconosciuta
+        aggiornamento_atteso: frequente
+        verificato: "si"
+        note: "Scheda HTML: RLI web (obbligatorio per agenti e >= 10 immobili), modalita ufficio/intermediari, obbligo APE nel contratto. Gran parte della prassi AdE e gia in CeDEF: scheda utile solo come procedura. Il servizio RLI web vero e proprio e in area riservata (login SPID/CIE/CNS, non scaricabile)."
+      - titolo: "Atti e contratti di locazione - Agenzia delle Entrate (RLI, RAP, adempimenti successivi)"
+        ente: "Agenzia delle Entrate"
+        livello: nazionale
+        ambito: lungo-termine
+        tipo: pagina-aiuto
+        url: "https://www.agenziaentrate.gov.it/portale/atti-e-contratti-di-locazione"
+        formato: html
+        data_documento: sconosciuta
+        aggiornamento_atteso: frequente
+        verificato: "si"
+        note: "Pagina HTML con procedura RLI online, termini 30 giorni, pagamenti. Possibile sovrapposizione con prassi AdE gia in archivio."
+      - titolo: "Modello RLI - Istruzioni per la richiesta di registrazione e adempimenti successivi (edizione 14 ottobre 2025)"
+        ente: "Agenzia delle Entrate"
+        livello: nazionale
+        ambito: lungo-termine
+        tipo: manuale
+        url: "https://www.agenziaentrate.gov.it/portale/documents/20143/9390371/RLI_istruzioni.pdf/9e4a3f27-43bd-9f5d-e3a8-92a5a14fab72?t=1760546481878"
+        formato: pdf
+        data_documento: "2025-10-14"
+        aggiornamento_atteso: occasionale
+        verificato: "si"
+        note: "PDF letto da pdftotext: 'MOD. RLI - Istruzioni per la richiesta di registrazione e adempimenti successivi'. Edizione ottobre 2025 indicata dai risultati; URL contiene timestamp ?t=: puo cambiare."
+      - titolo: "Imposta di soggiorno Valle d'Aosta - dichiarazione e pagamento (tramite il Comune competente)"
+        ente: "Regione Autonoma Valle d'Aosta"
+        livello: regionale
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "https://www.regione.vda.it/asstur/Imposta_soggiorno/default_i.aspx"
+        formato: html
+        data_documento: "2026-10-16"
+        aggiornamento_atteso: frequente
+        verificato: "si"
+        note: "Duplica la voce in regione-valle-aosta; per le modalita di presentazione e pagamento rimanda al singolo Comune: nessun portale unico trovato per Pre-Saint-Didier."
+      - titolo: "GEIS - portale gestori imposta di soggiorno Bologna"
+        ente: "Comune di Bologna"
+        livello: comunale
+        ambito: affitti-brevi
+        tipo: pagina-aiuto
+        url: "sconosciuto"
+        formato: altro
+        data_documento: sconosciuta
+        aggiornamento_atteso: n/a
+        verificato: "no"
+        note: "Dichiarazioni trimestrali (entro 15 giorni dal trimestre) e annuale (30 giugno) tramite 'GEIS' secondo fonti secondarie (Holidu/ricerca); URL del portale e pagina ufficiale del Comune non trovati. Portale ad accesso con credenziali."
