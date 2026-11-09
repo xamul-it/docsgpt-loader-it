@@ -1,4 +1,4 @@
-# Loader normativa italiana
+# docsgpt-loader-it — loader normativa italiana per DocsGPT
 
 Estensione per [DocsGPT](https://github.com/arc53/DocsGPT) che costruisce e
 mantiene aggiornato un archivio di **normativa, prassi e giurisprudenza
