@@ -284,9 +284,13 @@ def search(api_key: str, query: str, chunks: int = 5) -> List[Dict[str, Any]]:
 #      Fusion, like upstream's HybridRetriever but globally;
 #   3. groups chunks by document and returns each document once, with its most
 #      relevant passages.
-# The Italian keyword search relies on the GIN index
-# ``documents_text_fts_it_idx`` (to_tsvector('italian', text)), created by hand
-# on the pgvector database; without it the query still works, only slower.
+# The Italian keyword search uses the stored column ``tsv_it`` (tsvector
+# GENERATED ALWAYS AS to_tsvector('italian', text) STORED, GIN index
+# ``documents_tsv_it_idx``) when it exists: ranking then reads the stored
+# vector instead of recomputing it for every matching chunk, which on the
+# largest sources took the relaxed (OR) query past the timeout (8.1 s vs
+# 0.36 s measured) and silently returned no keyword hits. Without the column
+# it falls back to the expression, backed by ``documents_text_fts_it_idx``.
 # ``/api/search`` keeps using ``search`` unchanged.
 # ---------------------------------------------------------------------------
 
@@ -323,6 +327,34 @@ def _agent_source_ids(api_key: str) -> List[str]:
         raise SearchFailed("agent lookup failed") from e
 
 
+_TSV_COLUMN = "tsv_it"
+_tsv_column_cache: Dict[str, bool] = {}
+
+
+def _has_tsv_column(docsearch: Any, table: str) -> bool:
+    """Whether ``table`` has the stored tsvector column (checked once per process)."""
+    if table not in _tsv_column_cache:
+        conn = docsearch._get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "SELECT 1 FROM information_schema.columns WHERE table_name = %s AND column_name = %s",
+                (table, _TSV_COLUMN),
+            )
+            _tsv_column_cache[table] = cursor.fetchone() is not None
+            conn.commit()
+        except Exception as e:
+            logger.warning(f"tsvector column check failed on {table}: {e}")
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            return False
+        finally:
+            cursor.close()
+    return _tsv_column_cache[table]
+
+
 def _keyword_hits(docsearch: Any, source_id: str, text: str, k: int) -> List[tuple]:
     """Italian full-text hits of one pgvector source as ``(text, metadata, relaxed)``.
 
@@ -336,7 +368,11 @@ def _keyword_hits(docsearch: Any, source_id: str, text: str, k: int) -> List[tup
     table = docsearch._table_name
     text_col = getattr(docsearch, "_text_column", "text")
     meta_col = getattr(docsearch, "_metadata_column", "metadata")
-    tsv = f"to_tsvector('{_TS_CONFIG}'::regconfig, {text_col})"
+    tsv = (
+        _TSV_COLUMN
+        if _has_tsv_column(docsearch, table)
+        else f"to_tsvector('{_TS_CONFIG}'::regconfig, {text_col})"
+    )
     sql = (
         f"SELECT {text_col}, {meta_col} FROM {table}, ({{q}}) AS q(query) "
         f"WHERE source_id = %s AND numnode(q.query) > 0 AND {tsv} @@ q.query "
