@@ -3,21 +3,27 @@
 carica_docsgpt.py
 
 Carica su DocsGPT le raccolte scaricate da downloader.py, una sorgente per ente.
+Le fonti sulle locazioni (cartelle locazioni/<id>) sono sorgenti a sé, una per
+amministrazione, con il nome dato in fonti/locazioni.yaml.
 
 Uso:
   python carica_docsgpt.py --target /data/rag                       # tutti gli enti presenti
   python carica_docsgpt.py --target /data/rag --source agenzia-entrate
   python carica_docsgpt.py --target /data/rag --source normativa --replace
+  python carica_docsgpt.py --target /data/rag --source locazioni --agent "Claude - archivio fiscale"
 
-Per ogni ente (cartella di primo livello dell'archivio):
+Per ogni ente (cartella di primo livello dell'archivio, oppure locazioni/<id>):
   - impacchetta in uno zip non compresso i soli documenti citati nei manifest
     (<tipologia>/files/...); manifest, log, cartelle di debug e file orfani
     restano fuori. Nello zip il livello "files" viene tolto:
-    <tipologia>/<anno>/<documento>;
+    <tipologia>/<anno>/<documento>
+    (per locazioni/<id>, che non ha tipologie: direttamente <documento>);
   - lo invia a DocsGPT e attende la fine dell'indicizzazione;
   - se una sorgente con lo stesso nome esiste già l'ente viene saltato, a meno
     di --replace (che carica la nuova e, a indicizzazione riuscita, ricollega
     gli agenti ed elimina la vecchia: le ricerche non restano mai scoperte);
+  - con --agent collega la sorgente appena caricata all'agente indicato (le
+    sorgenti nuove non hanno agenti da ricollegare), senza togliergli le sue;
   - a caricamento riuscito toglie i documenti dell'ente dalla sorgente delle
     novità alimentata dal notifier: ormai stanno nella sorgente dell'ente;
   - registra dove sono pubblicati i documenti dell'ente (--docs-url), così le
@@ -63,6 +69,21 @@ SOURCE_NAMES = {
     "giurisprudenza": "Giurisprudenza",
 }
 
+
+def locazioni_names(path: Path) -> dict[str, str]:
+    """Cartella locazioni/<id> -> nome della sorgente, dall'elenco curato."""
+    try:
+        import yaml  # solo qui: nel container del notifier non c'è e non serve
+    except ImportError:
+        return {}
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return {f"locazioni/{s['id']}": s.get("nome") or f"Locazioni - {s['id']}" for s in data.get("sorgenti") or []}
+
+
+SOURCE_NAMES.update(locazioni_names(Path(__file__).resolve().parent / "fonti" / "locazioni.yaml"))
+# --source locazioni = tutte le sorgenti locazioni/<id>.
+GROUPS = {"locazioni": [e for e in SOURCE_NAMES if e.startswith("locazioni/")]}
+
 # Stessa configurazione usata per i primi caricamenti manuali.
 SOURCE_CONFIG = {
     "chunking": {"strategy": "classic_chunk", "max_tokens": 700, "min_tokens": 150},
@@ -90,7 +111,9 @@ def ente_documents(ente_dir: Path) -> list[tuple[Path, str]]:
         for path in paths:
             if not path.is_file() or path.stat().st_size == 0:
                 continue
-            docs.append((path, f"{tipologia}/{path.relative_to(files_dir).as_posix()}"))
+            inside = path.relative_to(files_dir).as_posix()
+            # Ente senza tipologie (locazioni/<id>): niente "./" davanti.
+            docs.append((path, inside if tipologia == "." else f"{tipologia}/{inside}"))
     return docs
 
 
@@ -137,13 +160,14 @@ def clear_novita(api: str, ente: str) -> None:
         log(f"    novità non tolte da \"{NOVITA_SOURCE}\": {resp.text[:200]}")
 
 
-def register_links(links_file: Path, docs_url: str, ente: str, new_id: str, old_ids: list[str]) -> None:
+def register_links(links_file: Path, docs_url: str, ente: str, new_id: str, old_ids: list[str], depth: int = 1) -> None:
     """Associa la nuova sorgente all'indirizzo pubblico dei documenti dell'ente."""
     links = json.loads(links_file.read_text()) if links_file.exists() else {}
     for old in old_ids:
         links.pop(old, None)
     # depth 1: nella sorgente <tipologia>/<anno>/..., in archivio <tipologia>/files/<anno>/...
-    links[new_id] = {"base": f"{docs_url.rstrip('/')}/{ente}", "depth": 1}
+    # depth 0 (locazioni/<id>): nella sorgente <documento>, in archivio files/<documento>
+    links[new_id] = {"base": f"{docs_url.rstrip('/')}/{ente}", "depth": depth}
     links_file.parent.mkdir(parents=True, exist_ok=True)
     tmp = links_file.with_suffix(".tmp")
     tmp.write_text(json.dumps(links, indent=1))
@@ -168,6 +192,22 @@ def repoint_agents(api: str, agents: list[dict], old_ids: list[str], new_id: str
             log(f"    agente \"{agent.get('name')}\" ricollegato alla nuova sorgente")
         else:
             log(f"    agente \"{agent.get('name')}\" NON ricollegato: {resp.text[:200]}")
+
+
+def attach_to_agent(api: str, agent_name: str, source_id: str) -> None:
+    """Aggiunge la sorgente a quelle dell'agente, senza togliergli le altre."""
+    resp = requests.get(f"{api}/api/get_agents", timeout=60)
+    resp.raise_for_status()
+    agents = [a for a in resp.json() if a.get("name") == agent_name]
+    if len(agents) != 1:
+        raise RuntimeError(f"agente \"{agent_name}\": trovati {len(agents)}, ne serve esattamente uno")
+    agent = agents[0]
+    sources = list(agent.get("sources") or [])
+    if source_id in sources:
+        return
+    resp = requests.put(f"{api}/api/update_agent/{agent['id']}", json={"sources": sources + [source_id]}, timeout=60)
+    resp.raise_for_status()
+    log(f"    sorgente aggiunta all'agente \"{agent_name}\" ({len(sources)} -> {len(sources) + 1} sorgenti)")
 
 
 def upload_zip(api: str, name: str, zip_path: Path) -> tuple[str, str]:
@@ -229,12 +269,14 @@ def wait_task(api: str, task_id: str) -> None:
         time.sleep(POLL_SECONDS)
 
 
-def load_ente(api: str, target: Path, ente: str, tmp_dir: Path, replace: bool, docs_url: str, links_file: Path) -> bool:
+def load_ente(api: str, target: Path, ente: str, tmp_dir: Path, replace: bool, docs_url: str, links_file: Path, agent_name: str = "") -> bool:
     name = SOURCE_NAMES[ente]
     log(f"== {ente} -> sorgente \"{name}\"")
     existing = list_sources(api).get(name, [])
     if existing and not replace:
         log("    già presente, salto (usa --replace per ricaricarla)")
+        if agent_name:
+            attach_to_agent(api, agent_name, existing[0])
         return True
 
     docs = ente_documents(target / ente)
@@ -244,7 +286,7 @@ def load_ente(api: str, target: Path, ente: str, tmp_dir: Path, replace: bool, d
     size = sum(p.stat().st_size for p, _ in docs)
     log(f"    documenti: {len(docs)}, {size / 1e9:.2f} GB")
 
-    zip_path = tmp_dir / f"{ente}.zip"
+    zip_path = tmp_dir / f"{ente.replace('/', '_')}.zip"
     started = time.time()
     try:
         build_zip(docs, zip_path)
@@ -265,11 +307,13 @@ def load_ente(api: str, target: Path, ente: str, tmp_dir: Path, replace: bool, d
             delete_source(api, new_id)
         raise
     if new_id:
-        register_links(links_file, docs_url, ente, new_id, existing)
+        register_links(links_file, docs_url, ente, new_id, existing, depth=0 if "/" in ente else 1)
     # Letti solo ora: gli agenti potrebbero essere cambiati durante l'indicizzazione.
     agents = agents_using(api, existing)
     if agents and new_id:
         repoint_agents(api, agents, existing, new_id)
+    if agent_name and new_id:
+        attach_to_agent(api, agent_name, new_id)
     for source_id in existing:
         log(f"    elimino la sorgente precedente {source_id}")
         delete_source(api, source_id)
@@ -284,10 +328,11 @@ def get_args():
     p.add_argument(
         "--source",
         action="append",
-        choices=list(SOURCE_NAMES),
-        help="Ente da caricare (ripetibile; default: tutti quelli presenti)",
+        choices=list(SOURCE_NAMES) + list(GROUPS),
+        help="Ente da caricare, o il gruppo locazioni (ripetibile; default: tutti quelli presenti)",
     )
     p.add_argument("--replace", action="store_true", help="Ricarica le sorgenti già presenti (la vecchia viene eliminata a nuova pronta)")
+    p.add_argument("--agent", default="", help="Agente a cui collegare le sorgenti caricate (di solito per quelle nuove)")
     p.add_argument("--api", default=API, help=f"URL di DocsGPT (default {API})")
     p.add_argument("--tmp", default=TMP_DIR, help=f"Cartella per lo zip temporaneo (default {TMP_DIR})")
     p.add_argument("--docs-url", default=DOCS_URL, help=f"Indirizzo pubblico della radice dell'archivio (default {DOCS_URL})")
@@ -298,7 +343,10 @@ def get_args():
 def main() -> int:
     args = get_args()
     target = Path(args.target).resolve()
-    enti = args.source or [e for e in SOURCE_NAMES if (target / e).is_dir()]
+    if args.source:
+        enti = [e for s in args.source for e in GROUPS.get(s, [s])]
+    else:
+        enti = [e for e in SOURCE_NAMES if (target / e).is_dir()]
 
     # Dal più piccolo al più grande: i problemi emergono prima sui carichi brevi.
     def ente_size(ente: str) -> int:
@@ -309,7 +357,7 @@ def main() -> int:
     failed = []
     for ente in enti:
         try:
-            if not load_ente(args.api, target, ente, Path(args.tmp), args.replace, args.docs_url, Path(args.links_file)):
+            if not load_ente(args.api, target, ente, Path(args.tmp), args.replace, args.docs_url, Path(args.links_file), args.agent):
                 failed.append(ente)
         except Exception as e:
             log(f"    ERRORE: {e}")
