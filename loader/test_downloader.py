@@ -315,7 +315,7 @@ class FakeFetcher:
 class CuratedTest(unittest.TestCase):
     """Kind "curated": elenco curato in YAML, una sorgente per amministrazione."""
 
-    HTML = b"<html><body>Regolamento</body></html>"
+    HTML = b"<html><body>" + b"Regolamento dell'imposta di soggiorno. " * 10 + b"</body></html>"
     PDF = b"%PDF-1.4 tariffe"
     URL_HTML = "https://www.comune.prova.it/regolamento"
     URL_PDF = "https://www.comune.prova.it/tariffe.pdf"
@@ -398,7 +398,7 @@ class CuratedTest(unittest.TestCase):
 
     def test_refresh_con_sha_cambiato_sovrascrive_e_registra_aggiornato(self):
         self.run_source({self.URL_HTML: self.HTML, self.URL_PDF: self.PDF})
-        nuovo = b"<html><body>Regolamento modificato</body></html>"
+        nuovo = b"<html><body>" + b"Regolamento modificato. " * 20 + b"</body></html>"
         _, _, stats = self.run_source({self.URL_HTML: nuovo, self.URL_PDF: self.PDF})
         self.assertEqual((stats["downloaded"], stats["updated"], stats["unchanged"]), (0, 1, 1))
         root = self.root / "archivio" / "locazioni/comune-prova"
@@ -420,6 +420,14 @@ class CuratedTest(unittest.TestCase):
         log = (self.root / "archivio" / "locazioni/comune-prova" / "errors.log").read_text(encoding="utf-8")
         self.assertIn("HTTP 404", log)
         self.assertEqual([r["title"] for r in self.manifest()], ["Tariffe 2026"])
+
+    def test_pagina_html_senza_testo_e_un_errore_non_un_documento(self):
+        # Es. il modulo di reindirizzamento di Airbnb: nessun contenuto da indicizzare.
+        guscio = b'<html><body onload="document.forms[0].submit()"><form><input type="hidden" value="x"></form></body></html>'
+        _, _, stats = self.run_source({self.URL_HTML: guscio, self.URL_PDF: self.PDF})
+        self.assertEqual((stats["downloaded"], stats["errors"]), (1, 1))
+        log = (self.root / "archivio" / "locazioni/comune-prova" / "errors.log").read_text(encoding="utf-8")
+        self.assertIn("senza testo", log)
 
     def test_sorgente_senza_voci_non_fallisce(self):
         _, _, stats = self.run_source({}, name="locazioni/regione-prova")

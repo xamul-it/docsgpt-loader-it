@@ -225,6 +225,8 @@ SOURCES = {
 # Elenco curato delle fonti sulle locazioni, relativo a questo file: lo script
 # gira anche dal container del notifier, dove la cartella è montata in /loader.
 CURATED_YAML = Path(__file__).resolve().parent / "fonti" / "locazioni.yaml"
+# Sotto questa soglia di caratteri una pagina html non e un documento.
+CURATED_MIN_TEXT = 200
 CURATED_REQUIRED = ("titolo", "ente", "tipo", "url", "verificato")
 
 
@@ -1851,6 +1853,9 @@ def curated_source(http: Http, store: Store, source_name: str, cfg: dict, mode: 
             if not content:
                 raise RuntimeError("risposta vuota")
             ext = ".pdf" if content.lstrip().startswith(b"%PDF-") else ".html"
+            if ext == ".html" and len(norm_text(BeautifulSoup(content, "html.parser").get_text(" "))) < CURATED_MIN_TEXT:
+                # Moduli di reindirizzamento, pagine che vivono di JavaScript: niente da indicizzare.
+                raise RuntimeError("pagina senza testo (reindirizzamento o contenuto caricato da JavaScript)")
             sha = hashlib.sha256(content).hexdigest()
             old = store.existing.get(url)
             have_old = mode == "refresh" and store.has_file(old)
