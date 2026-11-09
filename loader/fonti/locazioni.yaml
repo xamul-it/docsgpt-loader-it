@@ -174,8 +174,8 @@ sorgenti:
         formato: html
         data_documento: "2004-07-28"
         aggiornamento_atteso: raro
-        verificato: "no"
-        note: "URL citato dalla pagina regionale 'normativa appartamenti' ma l'apertura ha fatto redirect 302 a paginedicortesia.regione.emilia-romagna.it/down.html (sito in manutenzione/giu al momento). Riprovare; testo vigente atteso su Demetra."
+        verificato: "si"
+        note: "Testo vigente su Demetra (circa 10 mila parole), verificato il 2026-11-09 col downloader: una risposta occasionale senza contenuto era stata scambiata per manutenzione."
       - titolo: "Regione E-R - Normativa appartamenti ammobiliati per uso turistico (elenco L.R. 16/2004, DGR 2186/2005, 802/2007, 687/2023, 1270/2023)"
         ente: "Regione Emilia-Romagna - Turismo"
         livello: regionale
