@@ -58,7 +58,9 @@ UA = "Mozilla/5.0 (X11; Linux x86_64) FiscalArchiveNotifier/1.0"
 RSS_SOURCE = "agenzia-entrate/sito-agenzia"
 
 # Enti dell'archivio (cartelle di primo livello) che downloader.py sa aggiornare.
-ENTI = ["agenzia-entrate", "ministero-finanze", "agenzia-dogane-monopoli", "normativa", "giurisprudenza"]
+# "locazioni": elenco curato (loader/fonti/locazioni.yaml), una sorgente DocsGPT
+# per amministrazione; il downloader ne riconfronta sempre lo sha256.
+ENTI = ["agenzia-entrate", "ministero-finanze", "agenzia-dogane-monopoli", "normativa", "giurisprudenza", "locazioni"]
 
 # Stessa configurazione delle sorgenti caricate con carica_docsgpt.py.
 SOURCE_CONFIG = {
