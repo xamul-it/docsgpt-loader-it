@@ -21,7 +21,7 @@ from urllib.parse import parse_qsl, urljoin, urlparse
 
 import adattatori
 import downloader
-from fonte import Rete
+from fonte import Rete, xml_fromstring
 
 ESTENSIONI = {"xml": ("xml", "akn"), "pdf": ("pdf",), "json": ("json",), "csv": ("csv",),
               "docx": ("doc", "docx", "odt", "rtf"), "zip": ("zip",), "rss": ("rss", "atom")}
@@ -112,12 +112,8 @@ def _ricognisci_html(r: Ricognizione, url: str, html: str) -> None:
 
 
 def _ricognisci_xml(r: Ricognizione, data: bytes) -> None:
-    try:  # fonte non ancora verificata: defusedxml blocca entità esterne e "billion laughs"
-        from defusedxml.ElementTree import fromstring
-    except ImportError:  # host senza defusedxml (nel notifier c'è)
-        from xml.etree.ElementTree import fromstring
     try:
-        root = fromstring(data)
+        root = xml_fromstring(data)
     except Exception as e:
         r.avvisi.append(f"XML non valido: {e}")
         return

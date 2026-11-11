@@ -57,6 +57,28 @@ class ScriviTest(unittest.TestCase):
         self.assertIn("a", str(c.exception))
         self.assertFalse((self.tmp / "manifest.jsonl").exists())
 
+    def test_collisione_tra_parte_e_unita(self):        # C1
+        with self.assertRaises(FonteError):
+            e.scrivi_unita([U("a", testo=LUNGO), U("a-p1")], CFG, self.tmp, "v1")
+        self.assertFalse((self.tmp / "manifest.jsonl").exists())
+
+    def test_unita_di_navigazione_rifiutata(self):      # I3: anche negli aggiornamenti periodici
+        e.scrivi_unita(TRE, CFG, self.tmp, "v1")
+        cattive = [U("a"), U("b", testo="Vai al contenuto Home Menu Cerca"), U("c")]
+        with self.assertRaises(FonteError) as c:
+            e.scrivi_unita(cattive, CFG, self.tmp, "v2")
+        self.assertIn("b", str(c.exception))
+        self.assertIn("parole", (self.tmp / "files" / "b.html").read_text())
+
+    def test_unita_vuota_rifiutata_breve_ammessa(self):
+        with self.assertRaises(FonteError):
+            e.scrivi_unita([U("a", testo="Abrogato.")], CFG, self.tmp, "v1")
+        e.scrivi_unita([U("a", testo="Abrogato.", breve=True)], CFG, self.tmp, "v1")
+
+    def test_breve_ammesso_ma_navigazione_rifiutata(self):   # M9
+        with self.assertRaises(FonteError):
+            e.scrivi_unita([U("a", testo="Vai al contenuto", breve=True)], CFG, self.tmp, "v1")
+
     def test_id_non_valido_ferma(self):
         with self.assertRaises(FonteError):
             e.scrivi_unita([U("Art 1")], CFG, self.tmp, "v1")
@@ -182,9 +204,9 @@ class CaricaDocsgptTest(unittest.TestCase):
     def test_nomi_e_gruppi_da_pipeline(self):
         tmp = Path(tempfile.mkdtemp())
         import yaml
-        (tmp / "p.yaml").write_text(yaml.safe_dump({"sorgenti": [CFG]}))
+        (tmp / "p.yaml").write_text(yaml.safe_dump({"sorgenti": [CFG, {**CFG, "id": "in-prova", "provvisorio": True}]}))
         nomi = carica_docsgpt.pipeline_names(tmp / "p.yaml")
-        self.assertEqual(nomi, {"gruppo/prova": "Fonte finta"})
+        self.assertEqual(nomi, {"gruppo/prova": "Fonte finta"})   # I1: le provvisorie non sono live
 
 
 if __name__ == "__main__":

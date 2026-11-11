@@ -25,7 +25,6 @@ from fonte import FonteError, Rete
 from misura_formati import MIN_CARATTERI, campione
 from valuta_link import normalizza, valuta_link
 
-NAVIGAZIONE_MAX = 500        # testo corto con residui di navigazione = pagina di navigazione
 SOGLIA_TITOLO = 0.99
 SOGLIA_ACCORDO_FORMATI = 0.9
 
@@ -79,16 +78,8 @@ def controlla(out_dir: Path, attesi: list[str], riferimento: dict[str, str], obb
     quota = (len(attesi) - len(mancanti)) / max(1, len(attesi))
     esiti.append(_esito("conteggio_unita", quota, 1.0, not mancanti and bool(attesi), mancanti))
 
-    comuni = [re.compile(r, re.I) for r in fonte.RESIDUI_COMUNI]
-    vuote = []
-    for uid, u in unita.items():
-        t = u["testo"].strip()
-        if u["riga"].get("breve_ammesso"):
-            cattivo = not t
-        else:
-            cattivo = len(t) < min_caratteri or (len(t) < NAVIGAZIONE_MAX and any(r.search(t) for r in comuni))
-        if cattivo:
-            vuote.append(uid)
+    vuote = [uid for uid, u in unita.items()
+             if fonte.difetto_testo(u["testo"], bool(u["riga"].get("breve_ammesso")), min_caratteri)]
     esiti.append(_esito("testo_vuoto_o_navigazione", len(vuote), 0, not vuote, vuote))
 
     rx = [re.compile(r) for r in residui]
@@ -111,8 +102,9 @@ def controlla(out_dir: Path, attesi: list[str], riferimento: dict[str, str], obb
 
 
 def accordo_formati(unita_scritte: dict[str, dict], altro: dict[str, str]) -> Esito:
-    """Somiglianza media tra il testo estratto e lo stesso campione letto con un
-    altro formato della fonte: controllo indipendente dal formato scelto."""
+    """Somiglianza tra il testo estratto e lo stesso campione letto con un altro
+    formato della fonte (controllo indipendente dal formato scelto). Decide la
+    peggiore: basta un'unità diversa (es. testo attribuito all'unità sbagliata)."""
     rapporti, bassi = [], []
     for uid, testo in altro.items():
         a = normalizza(unita_scritte.get(uid, {}).get("testo", ""))
@@ -120,8 +112,8 @@ def accordo_formati(unita_scritte: dict[str, dict], altro: dict[str, str]) -> Es
         rapporti.append(r)
         if r < SOGLIA_ACCORDO_FORMATI:
             bassi.append(f"{uid} ({r:.2f})")
-    media = sum(rapporti) / max(1, len(rapporti))
-    return _esito("accordo_formati", media, SOGLIA_ACCORDO_FORMATI, media >= SOGLIA_ACCORDO_FORMATI, bassi)
+    peggiore = min(rapporti) if rapporti else 0.0
+    return _esito("accordo_formati", peggiore, SOGLIA_ACCORDO_FORMATI, bool(rapporti) and not bassi, bassi)
 
 
 def controlla_fonte(archivio: Path, cfg: dict, n: int = 10) -> list[Esito]:
@@ -141,12 +133,14 @@ def controlla_fonte(archivio: Path, cfg: dict, n: int = 10) -> list[Esito]:
             altro = {u.id: u.testo for u in ad.unita(Rete(base / "raw" / f"misura-{altri[0]}"), cfg, altri[0], solo=set(scelti))}
             esiti.append(accordo_formati(leggi_unita(base)[1], altro))
         except FonteError as e:
-            esiti.append(Esito("accordo_formati", 0, SOGLIA_ACCORDO_FORMATI, True, [f"non misurabile: {e}"[:120]]))
-    if cfg["link"] != "locale":
-        cand = cfg["link"].split(":", 1)[-1]
+            esiti.append(Esito("accordo_formati", 0, SOGLIA_ACCORDO_FORMATI, False, [f"non misurabile: {e}"[:120]]))
+    # Riscontro sulla pagina ufficiale (anche con link: locale): titolo e testo
+    # dell'unità devono comparire dove la fonte dice che stanno.
+    if ad.candidati_link:
+        cand = cfg["link"].split(":", 1)[-1] if cfg["link"] != "locale" else ad.candidati_link[0]
         r = valuta_link(ad, tutte, scelti[:5], rete)[cand]
         ok = r["status_200"] == 100.0 and r["assente"] == 0.0
-        esiti.append(_esito("link", r["status_200"] / 100, 1.0, ok, r.get("esempi_assenti", [])))
+        esiti.append(_esito("riscontro_link", r["status_200"] / 100, 1.0, ok, r.get("esempi_assenti", [])))
     return esiti
 
 
@@ -162,7 +156,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERRORE: {e}")
         return 1
     base = fonte.cartella(a.target, cfg)
-    (base / "qualita.json").write_text(json.dumps([e.__dict__ for e in esiti], ensure_ascii=False, indent=1))
+    # prova_fonte.py carica solo se questo file è tutto ok e il manifest non è cambiato dopo.
+    (base / "qualita.json").write_text(json.dumps(
+        {"manifest": fonte.impronta(base), "esiti": [e.__dict__ for e in esiti]}, ensure_ascii=False, indent=1))
     for e in esiti:
         print(f"{'OK  ' if e.ok else 'FAIL'} {e.nome:<26} {e.valore:<8} soglia {e.soglia:<5} "
               + (f"es. {', '.join(e.esempi)}"[:110] if e.esempi and not e.ok else ""))

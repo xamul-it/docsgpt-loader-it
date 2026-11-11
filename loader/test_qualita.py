@@ -39,7 +39,7 @@ class ControllaTest(unittest.TestCase):
 
     def scrivi(self, unita, d=None):
         d = d or self.tmp
-        estrai.scrivi_unita(unita, CFG, d, "v1")
+        estrai.scrivi_unita(unita, CFG, d, "v1", verifica=False)
         return d
 
     def controlla(self, d=None, attesi=None, rif=None):
@@ -108,12 +108,46 @@ class ControllaTest(unittest.TestCase):
         self.assertFalse(esito(self.controlla(), "file_e_manifest").ok)
 
     def test_cli_su_adattatore_finto(self):
-        with registrato(AdattatoreFinto()), mock.patch("qualita_estrazione.fonte.config", return_value=CFG):
+        class ReteSpecchio:   # pagina ufficiale = titolo e testo dell'unità
+            richieste_rete = byte_rete = 0
+            def get(self, url, fresca=False):
+                u = next(x for x in AdattatoreFinto().unita(ReteFinta(""), CFG, "intero") if x.link_ufficiali["pagina"] == url)
+                return Risposta(url, 200, "text/html", f"<h1>{u.titolo}</h1><p>{u.testo}</p>".encode())
+        with registrato(AdattatoreFinto()), mock.patch("qualita_estrazione.fonte.config", return_value=CFG), \
+                mock.patch("qualita_estrazione.Rete", return_value=ReteSpecchio()):
             d = fonte.cartella(self.tmp, CFG)
             estrai.scrivi_unita(AdattatoreFinto().unita(fonte.Rete(None), CFG, "intero"), CFG, d, "v1")
             self.assertEqual(q.main(["--target", str(self.tmp), "--id", "prova"]), 0)
             (d / "files" / "u-3.html").unlink()
             self.assertEqual(q.main(["--target", str(self.tmp), "--id", "prova"]), 1)
+
+
+class AccordoTest(unittest.TestCase):              # I5
+    def test_una_unita_diversa_basta_a_fallire(self):
+        scritte = {f"u-{i}": {"testo": "uguale " * 20} for i in range(10)}
+        altro = {f"u-{i}": "uguale " * 20 for i in range(9)} | {"u-9": "tutt'altro"}
+        self.assertFalse(q.accordo_formati(scritte, altro).ok)
+
+    def test_altro_formato_rotto_non_e_ok(self):
+        tmp = Path(tempfile.mkdtemp())
+        ad = AdattatoreFinto()
+        cfg = {**CFG, "formato": "intero"}
+        ad.formati = ("intero", "rotto")
+        d = fonte.cartella(tmp, cfg)
+        estrai.scrivi_unita(ad.unita(fonte.Rete(None), cfg, "intero"), cfg, d, "v1")
+        with registrato(ad), mock.patch("qualita_estrazione.Rete", return_value=ReteFinta("")):
+            esiti = {x.nome: x for x in q.controlla_fonte(tmp, cfg)}
+        self.assertFalse(esiti["accordo_formati"].ok)
+
+    def test_riscontro_link_sempre_anche_locale(self):
+        tmp = Path(tempfile.mkdtemp())
+        ad = AdattatoreFinto()
+        ad.formati = ("intero",)
+        d = fonte.cartella(tmp, CFG)
+        estrai.scrivi_unita(ad.unita(fonte.Rete(None), CFG, "intero"), CFG, d, "v1")
+        with registrato(ad), mock.patch("qualita_estrazione.Rete", return_value=ReteFinta("pagina vuota")):
+            esiti = {x.nome: x for x in q.controlla_fonte(tmp, CFG)}
+        self.assertFalse(esiti["riscontro_link"].ok)
 
 
 class ReteFinta:

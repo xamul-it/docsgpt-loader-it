@@ -199,9 +199,8 @@ residui 0 → titolo → percorso → costo; ammesse combinazioni se l'adattator
 dichiara (es. testo da un formato, gerarchia da un altro).
 
 ### 4. Divisione e link
-- **Divisione**: un file per unità. Un'unità oltre la soglia (predefinita 4000
-  caratteri, da confermare con le lunghezze misurate: p95 e massimo nel
-  rapporto) si divide sui blocchi naturali; ogni parte ripete in testa percorso
+- **Divisione**: un file per unità. Un'unità oltre la soglia (2400 caratteri: sotto
+  il chunk di DocsGPT da 700 token, così nessun pezzo perde percorso e titolo) si divide sui blocchi naturali; ogni parte ripete in testa percorso
   e titolo.
 - **Link: valutato, non assunto.** Candidati: copia locale servita dall'app
   (sempre disponibile) e i link ufficiali dichiarati dall'adattatore. Criteri,

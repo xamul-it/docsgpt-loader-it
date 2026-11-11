@@ -89,7 +89,9 @@ def pipeline_names(path: Path) -> dict[str, str]:
     if not path.exists():
         return {}
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    return {f"{s['gruppo']}/{s['id']}": s["nome"] for s in data.get("sorgenti") or [] if s.get("gruppo") and s.get("id")}
+    # Le fonti provvisorie (in prova o respinte) non si caricano: le promuove prova_fonte.py.
+    return {f"{s['gruppo']}/{s['id']}": s["nome"] for s in data.get("sorgenti") or []
+            if s.get("gruppo") and s.get("id") and not s.get("provvisorio")}
 
 
 SOURCE_NAMES.update(locazioni_names(Path(__file__).resolve().parent / "fonti" / "locazioni.yaml"))

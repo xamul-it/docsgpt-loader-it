@@ -71,7 +71,9 @@ def pipeline_gruppi(path: Path) -> list[str]:
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     except Exception:
         return []
-    return list(dict.fromkeys(s["gruppo"] for s in data.get("sorgenti") or [] if s.get("gruppo")))
+    # Escluse le fonti provvisorie (in prova o respinte) e i nomi già usati da downloader.py.
+    return list(dict.fromkeys(s["gruppo"] for s in data.get("sorgenti") or []
+                              if s.get("gruppo") and not s.get("provvisorio") and s["gruppo"] not in ENTI))
 
 
 PIPELINE_GRUPPI = pipeline_gruppi(Path(os.environ.get("LOADER_DIR", "/loader")) / "fonti" / "pipeline.yaml")

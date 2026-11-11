@@ -2,16 +2,16 @@
 # Letto da estrai.py, carica_docsgpt.py e dal notifier. Una voce per fonte:
 #
 #   - id: codice-civile              # cartella <archivio>/<gruppo>/<id>, prefisso delle domande in eval/
-#     gruppo: codici                 # --source di carica_docsgpt.py e ente del notifier
+#     gruppo: codici                 # --source di carica_docsgpt.py e ente del notifier (non un nome di downloader.py)
 #     nome: "Codice civile"          # nome della sorgente su DocsGPT
 #     adattatore: normattiva         # adattatori/<nome>.py
 #     url: "https://…"               # URL della fonte (lo riconosce l'adattatore)
 #     formato: akn-indice            # scelto in fase 3 con misure (misura_formati.py)
 #     link: locale                   # locale | <candidato> | entrambi:<candidato>, scelto in fase 4 (valuta_link.py)
-#     soglia_caratteri: 4000         # oltre, l'unità si divide sui blocchi
+#     soglia_caratteri: 2400         # oltre, l'unità si divide sui blocchi (chunk DocsGPT: 700 token)
 #     ente: "Normattiva"             # campo authority del manifest
 #     tipo_documento: "codice"       # campo document_type del manifest
-#     provvisorio: false             # true finché la fonte non è promossa
+#     provvisorio: true              # finché non è promossa: ignorata da carica_docsgpt e notifier
 #     # … parametri propri dell'adattatore (es. vigenza)
 
 sorgenti: []

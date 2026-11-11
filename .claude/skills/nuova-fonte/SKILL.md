@@ -73,7 +73,9 @@ Scrittura (nome adattatore = sito o ente, es. `normattiva`, `agenzia-entrate-faq
    `$ARCH/<gruppo>/<id>/raw/`) che servono a produrre 5–10 unità, comprese
    quelle difficili che hai visto (omonimie, numerazioni bis/ter, unità
    abrogate o vuote, la più lunga, pagina di errore). File grandi: ritagliali
-   tenendo la struttura (totale ≤ 500 KB). `contratto.json` come descritto in
+   tenendo la struttura (totale ≤ 500 KB). Nella cache ogni risposta è
+   `<sha256>.bin` con l'URL nel `<sha256>.json` accanto
+   (`grep -l '<pezzo di url>' raw/*.json`). `contratto.json` come descritto in
    `test_contratto.py`.
 3. **Codice**: copia `adattatori/_modello.py` in `adattatori/<nome>.py`, segui
    le regole del docstring, registra in `adattatori/__init__.py`. Ogni formato
@@ -93,7 +95,7 @@ Voce in `loader/fonti/pipeline.yaml` (valori di partenza, li cambiano le fasi 3�
     url: "<url>"
     formato: <primo formato dell'adattatore>
     link: locale
-    soglia_caratteri: 4000
+    soglia_caratteri: 2400
     ente: "<ente>"
     tipo_documento: "<tipo>"
     provvisorio: true
@@ -118,8 +120,9 @@ rapporto; aggiorna `formato` in `pipeline.yaml`.
 
 ## Fase 4 — Divisione e link
 
-- **Soglia di divisione**: 4000 caratteri, salvo p95 della tabella > 3000: allora
-  p95 arrotondato al migliaio superiore. Scrivi p95, max e soglia nel rapporto.
+- **Soglia di divisione**: 2400 caratteri, fissa. I chunk di DocsGPT sono di 700
+  token (~2500-2800 caratteri): un file più lungo verrebbe ri-spezzato e i pezzi
+  dopo il primo perderebbero percorso e titolo. Scrivi p95 e max nel rapporto.
 - **Link**:
   ```
   python3 valuta_link.py --target $ARCH --id <id>
@@ -135,8 +138,12 @@ rapporto; aggiorna `formato` in `pipeline.yaml`.
 python3 estrai.py --target $ARCH --id <id> --forza
 python3 qualita_estrazione.py --target $ARCH --id <id>
 ```
-Tutto OK → fase 6. Un FAIL → `fonte-analista` corregge l'adattatore (con un
-test che riproduce il caso, dai `esempi` della riga) e si rilancia una volta.
+Tutto OK → fase 6. Un FAIL (anche un `ERRORE` di `estrai.py`, che rifiuta
+unità vuote, di navigazione o con residui) → `fonte-analista` corregge
+l'adattatore (con un test che riproduce il caso, dai `esempi` della riga) e si
+rilancia una volta. `riscontro_link` controlla sulla pagina ufficiale che il
+testo stia dove l'adattatore dice, anche con `link: locale`. `prova_fonte.py`
+si rifiuta di caricare senza `qualita.json` tutto OK sull'estrazione attuale.
 
 ## Fase 6 — Prova e benchmark
 
@@ -167,7 +174,10 @@ test che riproduce il caso, dai `esempi` della riga) e si rilancia una volta.
 Un solo messaggio all'utente: link al rapporto e 5 righe (unità e quante,
 formato e perché, link e perché, qualità, benchmark). Domanda: "Collego la
 fonte a Claude?".
-- **Sì** (`fonte-esecutore`): `python3 prova_fonte.py promuovi --id <id>`;
-  in `pipeline.yaml` togli `provvisorio`; commit di adattatore, fixture, test,
-  `pipeline.yaml`, domande e rapporto. Il notifier la aggiorna da solo.
-- **No**: `python3 prova_fonte.py pulisci --id <id>`; rapporto con l'esito.
+- **Sì** (`fonte-esecutore`): `python3 prova_fonte.py promuovi --id <id>`
+  (rifiuta se manca un benchmark PASS sull'estrazione attuale); in
+  `pipeline.yaml` togli `provvisorio: true`; commit sul branch corrente di
+  adattatore, fixture, test, `pipeline.yaml`, domande e rapporto. Da allora il
+  notifier la aggiorna da solo (le voci provvisorie le ignora).
+- **No**: `python3 prova_fonte.py pulisci --id <id>`; togli la voce da
+  `pipeline.yaml`; rapporto con l'esito.

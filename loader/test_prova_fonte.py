@@ -49,21 +49,54 @@ class PulisciTest(unittest.TestCase):
         tmp = Path(tempfile.mkdtemp())
         links = tmp / "doc_links.json"
         links.write_text(json.dumps({"s1": {"base": "x", "depth": 0}, "altra": {"base": "y", "depth": 1}}))
-        d = tmp / "gruppo" / "prova"
-        d.mkdir(parents=True)
-        (d / "prova.json").write_text(json.dumps({"source_id": "s1", "agent_id": "a1", "key": "k"}))
+        stati = tmp / "stati"
+        stati.mkdir()
+        p.stato_prova(stati, CFG).write_text(json.dumps({"source_id": "s1", "agent_id": "a1", "key": "k"}))
         with mock.patch("prova_fonte.requests.delete") as delete, \
                 mock.patch("prova_fonte.carica_docsgpt.delete_source") as del_src, \
                 mock.patch("prova_fonte.carica_docsgpt.list_sources", return_value={}), \
                 mock.patch("prova_fonte.requests.get") as get:
             get.return_value.json.return_value = []
-            p.pulisci("http://api", tmp, CFG, links)
+            p.pulisci("http://api", stati, CFG, links)
             delete.assert_called_once()
             self.assertIn("id=a1", delete.call_args.args[0])
             del_src.assert_called_once_with("http://api", "s1")
             self.assertEqual(set(json.loads(links.read_text())), {"altra"})
-            self.assertFalse((d / "prova.json").exists())
-            p.pulisci("http://api", tmp, CFG, links)   # seconda volta: niente da fare, nessun errore
+            self.assertFalse(p.stato_prova(stati, CFG).exists())
+            p.pulisci("http://api", stati, CFG, links)   # seconda volta: niente da fare, nessun errore
+
+
+class GateTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        import estrai
+        from test_supporto import unita_finte
+        self.d = self.tmp / "gruppo" / "prova"
+        estrai.scrivi_unita(unita_finte(), CFG, self.d, "v1")
+        self.stati = self.tmp / "stati"
+
+    def test_stato_fuori_dall_archivio(self):          # I2
+        self.assertFalse(str(p.stato_prova(self.stati, CFG)).startswith(str(self.tmp / "gruppo")))
+
+    def test_prova_senza_qualita_ok_rifiutata(self):   # I4
+        with self.assertRaises(p.FonteError):
+            p.richiedi_qualita(self.tmp, CFG)
+        (self.d / "qualita.json").write_text(json.dumps({"manifest": p.impronta(self.d), "esiti": [{"nome": "x", "ok": False}]}))
+        with self.assertRaises(p.FonteError):
+            p.richiedi_qualita(self.tmp, CFG)
+        (self.d / "qualita.json").write_text(json.dumps({"manifest": p.impronta(self.d), "esiti": [{"nome": "x", "ok": True}]}))
+        p.richiedi_qualita(self.tmp, CFG)
+        (self.d / "manifest.jsonl").write_text((self.d / "manifest.jsonl").read_text() + "\n")
+        with self.assertRaises(p.FonteError):   # manifest cambiato dopo il controllo
+            p.richiedi_qualita(self.tmp, CFG)
+
+    def test_promuovi_senza_bench_pass_rifiutata(self):
+        self.stati.mkdir()
+        p.stato_prova(self.stati, CFG).write_text(json.dumps({"bench": {"ok": False, "manifest": p.impronta(self.d)}}))
+        with self.assertRaises(p.FonteError):
+            p.richiedi_bench(self.tmp, self.stati, CFG)
+        p.stato_prova(self.stati, CFG).write_text(json.dumps({"bench": {"ok": True, "manifest": p.impronta(self.d)}}))
+        p.richiedi_bench(self.tmp, self.stati, CFG)
 
 
 if __name__ == "__main__":

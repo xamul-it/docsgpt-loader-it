@@ -113,7 +113,11 @@ def _leggi_manifest(out_dir: Path) -> list[dict]:
     return [json.loads(x) for x in m.read_text(encoding="utf-8").splitlines() if x.strip()]
 
 
-def scrivi_unita(unita: list[Unita], cfg: dict, out_dir: Path, versione: str, minimo_precedente: float = 0.5) -> Rapporto:
+def scrivi_unita(unita: list[Unita], cfg: dict, out_dir: Path, versione: str, minimo_precedente: float = 0.5,
+                 verifica: bool = True, residui: list[str] | None = None) -> Rapporto:
+    """Scrive file, manifest e stato. Con verifica (sempre, fuori dai test che
+    costruiscono archivi difettosi) rifiuta tutto se un'unità è vuota, è una
+    pagina di navigazione o ha residui: anche negli aggiornamenti periodici."""
     out_dir = Path(out_dir)
     ids = [u.id for u in unita]
     doppi = sorted({i for i in ids if ids.count(i) > 1})
@@ -122,6 +126,13 @@ def scrivi_unita(unita: list[Unita], cfg: dict, out_dir: Path, versione: str, mi
     non_validi = [i for i in ids if not re.match(fonte.ID_RE, i)]
     if non_validi:
         raise FonteError(f"id non validi (servono minuscole, cifre e trattini): {', '.join(non_validi[:10])}")
+    if verifica:
+        rx = [re.compile(r) for r in (residui or [])]
+        cattive = [f"{u.id} ({d})" for u in unita
+                   if (d := fonte.difetto_testo(u.testo, u.breve_ammesso) or
+                       ("residui" if any(r.search(u.testo) for r in rx) else None))]
+        if cattive:
+            raise FonteError(f"{len(cattive)} unità non valide, non tocco nulla: {', '.join(cattive[:10])}")
     precedenti = _leggi_manifest(out_dir)
     n_prec = len({r.get("unit_id") for r in precedenti})
     if not unita or (n_prec and len(unita) < minimo_precedente * n_prec):
@@ -170,6 +181,10 @@ def scrivi_unita(unita: list[Unita], cfg: dict, out_dir: Path, versione: str, mi
                 "versione": versione,
                 **u.metadati,
             })
+    nomi = [r["local_file"] for r in righe]
+    doppi = sorted({n for n in nomi if nomi.count(n) > 1})
+    if doppi:
+        raise FonteError(f"file ripetuti (id che coincide con una parte di un'altra unità): {', '.join(doppi[:10])}")
     detail = [r["detail_url"] for r in righe]
     if len(detail) != len(set(detail)):
         raise FonteError("detail_url ripetuti: i link ufficiali dell'adattatore non sono unici per unità")
@@ -206,7 +221,8 @@ def estrai_fonte(archivio: Path, cfg: dict, forza: bool = False) -> Rapporto | N
         return None
     # Versione nuova: la cache non vale più, si rilegge la fonte.
     rete = Rete(out / "raw" / versione.replace("/", "_")) if versione else Rete(out / "raw")
-    return scrivi_unita(ad.unita(rete, cfg, cfg["formato"]), cfg, out, versione)
+    return scrivi_unita(ad.unita(rete, cfg, cfg["formato"]), cfg, out, versione,
+                        residui=[*fonte.RESIDUI_COMUNI, *ad.residui])
 
 
 def main(argv: list[str] | None = None) -> int:

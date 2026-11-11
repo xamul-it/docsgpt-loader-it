@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -19,7 +20,8 @@ import requests
 
 import downloader
 
-ID_RE = r"^[a-z0-9][a-z0-9-]*$"
+# Il suffisso -p<k> è riservato alle parti delle unità divise (estrai.py).
+ID_RE = r"^(?!.*-p\d+$)[a-z0-9][a-z0-9-]*$"
 
 # Testo di pagine di navigazione: non deve mai finire in un'unità.
 RESIDUI_COMUNI = [
@@ -29,7 +31,13 @@ RESIDUI_COMUNI = [
     r"Accetta (tutti i )?cookie",
 ]
 
+MIN_CARATTERI = 40
+NAVIGAZIONE_MAX = 500        # testo corto con residui di navigazione = pagina di navigazione
+
 PIPELINE_YAML = Path(__file__).resolve().parent / "fonti" / "pipeline.yaml"
+# Cartelle di primo livello già usate da downloader.py: un gruppo della pipeline
+# con lo stesso nome dirotterebbe gli aggiornamenti del notifier.
+GRUPPI_RISERVATI = frozenset({k.split("/", 1)[0] for k in downloader.SOURCES} | {"locazioni"})
 CAMPI_CONFIG = ("id", "gruppo", "nome", "adattatore", "url", "formato", "link", "soglia_caratteri", "ente", "tipo_documento")
 
 
@@ -141,6 +149,35 @@ class Adattatore(Protocol):
     def casi_limite(self, rete: Rete, cfg: dict) -> list[str]: ...
 
 
+def difetto_testo(testo: str, breve_ammesso: bool, min_caratteri: int = MIN_CARATTERI) -> str | None:
+    """Perché un testo non è un contenuto valido ("vuoto", "navigazione"), o None.
+    Una unità breve_ammesso può essere corta, ma non una pagina di navigazione."""
+    t = testo.strip()
+    if not t:
+        return "vuoto"
+    if len(t) < NAVIGAZIONE_MAX and any(re.search(r, t, re.I) for r in RESIDUI_COMUNI):
+        return "navigazione"
+    if not breve_ammesso and len(t) < min_caratteri:
+        return "vuoto"
+    return None
+
+
+def xml_fromstring(data: bytes):
+    """XML di una fonte: defusedxml (blocca entità esterne e "billion laughs") se
+    installato, come nel container del notifier; altrimenti la libreria standard."""
+    try:
+        from defusedxml.ElementTree import fromstring
+    except ImportError:
+        from xml.etree.ElementTree import fromstring
+    return fromstring(data)
+
+
+def impronta(cartella_fonte: Path) -> str:
+    """sha256 del manifest: lega esiti di qualità e benchmark a un'estrazione precisa."""
+    m = Path(cartella_fonte) / "manifest.jsonl"
+    return hashlib.sha256(m.read_bytes()).hexdigest() if m.exists() else ""
+
+
 def configs(path: Path = PIPELINE_YAML) -> list[dict]:
     import yaml  # qui: chi non usa la configurazione non ne ha bisogno
     data = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
@@ -153,6 +190,8 @@ def config(id: str, path: Path = PIPELINE_YAML) -> dict:
             mancanti = [k for k in CAMPI_CONFIG if c.get(k) in (None, "")]
             if mancanti:
                 raise FonteError(f"{id}: mancano in {Path(path).name}: {', '.join(mancanti)}")
+            if c["gruppo"] in GRUPPI_RISERVATI:
+                raise FonteError(f"{id}: il gruppo '{c['gruppo']}' è già usato da downloader.py; scegline un altro")
             return c
     raise FonteError(f"{id}: fonte non presente in {Path(path).name}")
 

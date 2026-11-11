@@ -7,15 +7,17 @@ qualità e caricamento li fa il nucleo: qui non vanno.
 Regole:
 - tutte le richieste passano da `rete.get(url)` (cache su disco; nei test,
   fixture): mai requests diretto;
-- id stabile, unico, ASCII minuscolo con trattini (fonte.ID_RE): diventa il
-  nome del file; se la fonte ripete un numero in parti diverse, la parte entra
+- id stabile, unico, ASCII minuscolo con trattini (fonte.ID_RE; il suffisso
+  -p<numero> è riservato alle parti): diventa il nome del file; se la fonte ripete un numero in parti diverse, la parte entra
   nell'id;
 - testo pulito, blocchi naturali (commi, paragrafi) separati da "\\n\\n": il
   nucleo divide lì le unità lunghe;
 - risposta inattesa (pagina di errore, formato diverso) -> FonteError con un
   messaggio chiaro, mai una lista vuota "valida";
-- breve_ammesso=True solo per unità legittimamente corte (es. abrogate);
-- dipendenze: requests, beautifulsoup4, defusedxml, PyYAML (niente lxml).
+- unità legittimamente corte (abrogate): breve_ammesso=True e comunque un
+  testo non vuoto (es. "Articolo abrogato dalla L. …");
+- XML: fonte.xml_fromstring (mai import diretti di defusedxml/lxml); HTML:
+  BeautifulSoup(..., "html.parser"). Altre dipendenze: requests, PyYAML.
 
 Registrazione, in adattatori/__init__.py:
     from adattatori.<nome> import <Classe>
@@ -26,7 +28,7 @@ risposte reali, compresi i casi difficili; test propri in test_<nome>.py.
 
 from __future__ import annotations
 
-from fonte import FonteError, Rete, Unita  # noqa: F401
+from fonte import FonteError, Rete, Unita, xml_fromstring  # noqa: F401
 
 
 class Modello:

@@ -38,6 +38,12 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(f.config("x", self.tmp / "p.yaml")["soglia_caratteri"], 4000)
         self.assertEqual([c["id"] for c in f.configs(self.tmp / "p.yaml")], ["x"])
 
+    def test_config_gruppo_riservato(self):            # I6
+        voce = {k: "v" for k in f.CAMPI_CONFIG} | {"id": "x", "gruppo": "normativa"}
+        self.scrivi_yaml([voce])
+        with self.assertRaises(f.FonteError):
+            f.config("x", self.tmp / "p.yaml")
+
     def test_config_assente(self):
         self.scrivi_yaml([])
         with self.assertRaises(f.FonteError):
@@ -84,6 +90,11 @@ class ReteTest(unittest.TestCase):
         self.assertEqual(r.get("http://a").text, "ciao")
         with self.assertRaises(f.ReteMancante):
             r.get("http://non-previsto")
+
+
+class XmlTest(unittest.TestCase):                 # I7
+    def test_xml_fromstring(self):
+        self.assertEqual(f.xml_fromstring(b"<a><b/></a>").tag, "a")
 
 
 class RegistroTest(unittest.TestCase):
