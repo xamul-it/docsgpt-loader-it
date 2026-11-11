@@ -75,6 +75,13 @@ class GateTest(unittest.TestCase):
         estrai.scrivi_unita(unita_finte(), CFG, self.d, "v1")
         self.stati = self.tmp / "stati"
 
+    def test_stato_scritto_solo_dal_proprietario(self):
+        import stat
+        p.scrivi_stato(self.stati, CFG, {"key": "k"})
+        f = p.stato_prova(self.stati, CFG)
+        self.assertEqual((stat.S_IMODE(f.stat().st_mode), stat.S_IMODE(self.stati.stat().st_mode)), (0o600, 0o700))
+        self.assertEqual(json.loads(f.read_text()), {"key": "k"})
+
     def test_stato_fuori_dall_archivio(self):          # I2
         self.assertFalse(str(p.stato_prova(self.stati, CFG)).startswith(str(self.tmp / "gruppo")))
 

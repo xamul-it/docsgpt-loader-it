@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -67,6 +68,14 @@ def crea_agente_prova(api: str, id: str, source_id: str) -> tuple[str, str]:
 
 def stato_prova(stati: Path, cfg: dict) -> Path:
     return Path(stati) / f"{cfg['gruppo']}--{cfg['id']}.json"
+
+
+def scrivi_stato(stati: Path, cfg: dict, dati: dict) -> None:
+    """Contiene la chiave dell'agente: file 600 creato già così, cartella 700."""
+    Path(stati).mkdir(mode=0o700, parents=True, exist_ok=True)
+    fd = os.open(stato_prova(stati, cfg), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump(dati, f)
 
 
 def _leggi_stato(stati: Path, cfg: dict) -> dict:
@@ -143,9 +152,7 @@ def prova(api: str, archivio: Path, stati: Path, cfg: dict, tmp_dir: Path, docs_
     carica_docsgpt.wait_task(api, task_id)
     carica_docsgpt.register_links(links_file, docs_url, ente, source_id, [], depth=0)
     agent_id, key = crea_agente_prova(api, cfg["id"], source_id)
-    Path(stati).mkdir(parents=True, exist_ok=True)
-    stato_prova(stati, cfg).write_text(json.dumps({"source_id": source_id, "agent_id": agent_id, "key": key}))
-    stato_prova(stati, cfg).chmod(0o600)
+    scrivi_stato(stati, cfg, {"source_id": source_id, "agent_id": agent_id, "key": key})
     print(f"prova pronta: sorgente {source_id}, agente prova-{cfg['id']}, {len(docs)} file")
     return source_id, agent_id
 
@@ -175,7 +182,7 @@ def bench(archivio: Path, stati: Path, cfg: dict) -> tuple[bool, float, Path]:
     righe = [json.loads(x) for x in proc.stdout.splitlines() if x.strip()]
     ok, quota = esito_benchmark(righe)
     stato["bench"] = {"ok": ok, "quota": quota, "manifest": impronta(fonte.cartella(archivio, cfg)), "file": out.name}
-    stato_prova(stati, cfg).write_text(json.dumps(stato))
+    scrivi_stato(stati, cfg, stato)
     for r in righe:
         if r["mode"] == "B":
             print(f"  {r['id']:<24} rank {r['ranks']}  top3: {', '.join(r.get('top3') or [])[:80]}")
