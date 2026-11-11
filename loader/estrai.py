@@ -19,6 +19,7 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import adattatori
 import downloader
@@ -133,6 +134,9 @@ def scrivi_unita(unita: list[Unita], cfg: dict, out_dir: Path, versione: str, mi
     contenuti: dict[str, bytes] = {}
     divise = 0
     for u in unita:
+        for nome_link, url in u.link_ufficiali.items():
+            if urlsplit(url).scheme not in ("http", "https"):
+                raise FonteError(f"{u.id}: link '{nome_link}' non http/https: {url[:80]}")
         conflitti = set(u.metadati) & set(CAMPI_MANIFEST)
         if conflitti:
             raise FonteError(f"{u.id}: metadati con nomi riservati del manifest: {', '.join(sorted(conflitti))}")

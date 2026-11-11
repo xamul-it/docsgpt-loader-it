@@ -113,6 +113,12 @@ class ScriviTest(unittest.TestCase):
         self.assertEqual(manifest(self.tmp)[0]["link"], "http://u")
         self.assertIn('href="http://u"', (self.tmp / "files" / "a.html").read_text())
 
+    def test_link_non_http_rifiutato(self):
+        with self.assertRaises(FonteError):
+            e.scrivi_unita([U("a", link_ufficiali={"urn": "javascript:alert(1)"})], {**CFG, "link": "urn"}, self.tmp, "v1")
+        with self.assertRaises(FonteError):
+            e.scrivi_unita([U("a", link_ufficiali={"urn": "javascript:alert(1)"})], CFG, self.tmp, "v1")
+
     def test_link_locale_niente_link_nel_testo(self):
         e.scrivi_unita([U("a", link_ufficiali={"urn": "http://u"})], CFG, self.tmp, "v1")
         self.assertEqual(manifest(self.tmp)[0]["link"], "")
