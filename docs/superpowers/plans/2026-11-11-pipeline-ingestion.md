@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** costruire il nucleo comune (contratto dell'unità, rete con cache, misura, estrazione, qualità, prova) e la skill `/nuova-fonte`, che crea il loader di una fonte generica come adattatore; il primo adattatore è Normattiva. Il collaudo sul Codice civile è fuori da questo piano (sessione nuova).
+**Goal:** costruire il nucleo comune (contratto dell'unità, rete con cache, misura, estrazione, qualità, prova) e la skill `/nuova-fonte`, che crea, testa e verifica il loader di una fonte generica come adattatore standard. Nessun adattatore di fonte reale si scrive qui: il primo (Normattiva, Codice civile) lo deve scrivere la pipeline nel collaudo, in una sessione nuova.
 
 **Architecture:** ogni fonte è un adattatore in `loader/adattatori/` che produce `fonte.Unita`; tutto il resto è codice comune in `loader/` (misura dei formati, scrittura un-file-per-unità con aggiornamento incrementale, valutazione dei link, test di qualità, caricamento in prova). I test di contratto valgono per ogni adattatore e girano su fixture, senza rete. La skill descrive fasi, regole di decisione e punti di contatto con l'utente; due sottoagenti con modello fissato (Sonnet per analisi e codice, Haiku per eseguire e riassumere) la eseguono. Ogni fonte ha un rapporto in `docs/ingestion/`.
 
@@ -28,11 +28,11 @@
 
 ## Review Focus
 
-1. **Id ripetuti** (art. 1 delle preleggi e art. 1 del codice): l'adattatore Normattiva dà due id distinti; se un adattatore qualsiasi produce id duplicati, `estrai` si ferma con errore che li nomina invece di sovrascrivere. → test in Task 3 e Task 5.
-2. **Unità corte legittime e numeri "bis"** (205 bis/ter/…, ~193 abrogati nel Codice civile): id normalizzato (`cc-art-42-bis`); l'abrogato ha `breve_ammesso=True` e non conta come testo vuoto. → test in Task 3 e Task 6.
-3. **La fonte risponde con una pagina di errore invece del formato atteso** (HTML al posto dell'XML, zero unità): l'adattatore solleva un errore chiaro; `estrai` con zero unità, o meno della metà di quelle già nel manifest, esce con codice 1 senza toccare i file. → test in Task 2 e Task 5.
-4. **Riesecuzione con versione invariata**: nessuna riscrittura; con versione cambiata, riscritte solo le unità cambiate (sha256), rimossi i file delle unità sparite. → test in Task 5.
-5. **Unità lunghe** (max osservato 10.503 caratteri, p95 1.604): divise sui blocchi separati da riga vuota oltre soglia, ogni parte con percorso e titolo in testa e `-p<k>` nel nome. → test in Task 5.
+1. **Id ripetuti** (es. art. 1 delle preleggi e art. 1 del codice): se un adattatore produce id duplicati, `estrai` si ferma con errore che li nomina invece di sovrascrivere; il test di contratto li rifiuta. → test in Task 1 e Task 4.
+2. **Unità corte legittime** (es. ~193 articoli abrogati nel Codice civile): con `breve_ammesso=True` non contano come testo vuoto, senza il flag sì. → test in Task 3 e Task 5.
+3. **La fonte risponde con una pagina di errore invece del formato atteso** (HTML al posto dell'XML, zero unità): `estrai` con zero unità, o meno della metà di quelle già nel manifest, esce con codice 1 senza toccare i file; `esplora_fonte` segnala status ≠ 200 e pagine vuote. → test in Task 2 e Task 4.
+4. **Riesecuzione con versione invariata**: nessuna riscrittura; con versione cambiata, riscritte solo le unità cambiate (sha256), rimossi i file delle unità sparite. → test in Task 4.
+5. **Unità lunghe** (max osservato 10.503 caratteri, p95 1.604): divise sui blocchi separati da riga vuota oltre soglia, ogni parte con percorso e titolo in testa e `-p<k>` nel nome. → test in Task 4.
 
 ---
 
@@ -88,85 +88,47 @@ def test_trova(self):
 - [ ] **Step 5:** stesso comando → PASS; `python3 -m unittest test_downloader` → PASS (niente di rotto)
 - [ ] **Step 6:** `git add loader/fonte.py loader/adattatori loader/fonti/pipeline.yaml loader/test_fonte.py loader/test_contratto.py && git commit -m "pipeline: contratto dell'unità, rete con cache e registro degli adattatori"`
 
-### Task 2: Adattatore Normattiva — client e indice
+### Task 2: Ricognizione della fonte (fase 1)
+
+Il passo che oggi si fa a mano ("leggo la sorgente, capisco il dato") diventa uno script: l'agente legge un riepilogo compatto, non le pagine.
 
 **Files:**
-- Create: `loader/adattatori/normattiva.py`
-- Modify: `loader/test_normattiva.py` (già scritto, non in git: solo l'import diventa `from adattatori import normattiva as n`)
-- Fixture già presenti: `loader/fixtures/normattiva/akn_campione.xml`, `indice_campione.html`
-- Create: `loader/fixtures/normattiva/articolo_1399.html` (pagina `caricaArticolo` dell'art. 1399, scaricata una volta con `UA`)
+- Create: `loader/esplora_fonte.py`
+- Test: `loader/test_esplora_fonte.py` (pagine HTML/XML scritte nel test, nessuna rete)
 
 **Interfaces:**
-- Consumes: `fonte.Rete`, `fonte.FonteError`
-- Produces (tutto già fissato da `test_normattiva.py`, che è la specifica):
-  - `class NormattivaError(FonteError)`
-  - `@dataclass(frozen=True) class ActRef: data_gu: str; codice_redaz: str; urn: str | None = None`
-  - `act_ref_from_url(url) -> ActRef` (ELI con o senza `/CONSOLIDATED/<data>`, `caricaDettaglioAtto`; altro → `NormattivaError`)
-  - `akn_url(ref, data_vigenza) -> str`, `pagina_atto_url(ref) -> str`
-  - `fetch_akn(rete_o_session, ref, data_vigenza) -> bytes` — `NormattivaError` se non è XML con radice `akomaNtoso`
-  - `normalizza_num(s) -> str` (`"Art. 42 bis."` → `"42-bis"`)
-  - `@dataclass class Voce: num: str; percorso: list[str]; url_articolo: str`; `parse_indice(html) -> list[Voce]` in ordine di pagina (le voci senza "art." in testa sono gli articoli del R.D. ed escluse); `allinea(nums: list[str], voci: list[Voce]) -> list[Voce]` (stessa lunghezza e ordine di `nums`, gestisce i numeri ripetuti scorrendo in avanti)
-  - `UA = downloader.CURATED_UA`
-- `fetch_akn` accetta sia `fonte.Rete` sia un oggetto con `.get(url)` che restituisce `status_code`, `headers`, `content` (il mock del test): normalizzare in un helper.
-
-- [ ] **Step 1:** aggiornare l'import in `test_normattiva.py`; `cd loader && python3 -m unittest test_normattiva -v` → FAIL (modulo assente)
-- [ ] **Step 2:** implementare le funzioni sopra (BeautifulSoup per l'indice: studiare il markup nella fixture; `defusedxml.ElementTree.fromstring` per il controllo della radice)
-- [ ] **Step 3:** → PASS
-- [ ] **Step 4:** `git add loader/adattatori/normattiva.py loader/test_normattiva.py loader/fixtures/normattiva && git commit -m "adattatore normattiva: client AKN e indice dell'atto"`
-
-### Task 3: Adattatore Normattiva — AKN, formati, contratto
-
-**Files:**
-- Create: `loader/adattatori/akn.py`
-- Modify: `loader/adattatori/normattiva.py` (classe `Normattiva`), `loader/adattatori/__init__.py` (registrarla)
-- Create: `loader/fixtures/normattiva/contratto.json`
-- Test: `loader/test_akn.py`
-
-**Interfaces:**
-- Consumes: Task 1 (`Unita`, `Adattatore`, `Rete`), Task 2
+- Consumes: `fonte.Rete`, `adattatori.trova`
 - Produces:
-  - `akn.py`: `@dataclass class ArticoloAkn: parte: str; num: str; rubrica: str; testo: str; eid: str; abrogato: bool; marcatori_rimossi: int`; `@dataclass class AttoAkn: frbr_uri: str; urn_nir: str; eli: str; data_consolidamento: str; articoli: list[ArticoloAkn]`; `parse_akn(xml: bytes) -> AttoAkn`; `slug_parte(parte) -> str` (`"CODICE CIVILE"` → `"cc"`, `"Disposizioni sulla legge in generale"` → `"preleggi"`, altrimenti slug ASCII).
-  - `Normattiva` (adattatore): `nome="normattiva"`; `formati=("akn-indice", "akn", "html-articolo")` (testo AKN + percorso dall'indice; solo AKN; pagina `caricaArticolo` per articolo); `metadati_obbligatori=("urn", "parte", "articolo", "data_vigenza")`; `residui=(r"\(\(\d+\)\)",)`; `candidati_link=("urn", "articolo")` (`uri-res/N2Ls?<urn>~art<num senza trattino>` e `Voce.url_articolo`).
-  - Unità: `id = f"{slug_parte(parte)}-art-{num}"`, `titolo = f"Art. {num} – {rubrica}"` (senza rubrica: `f"Art. {num}"`), `percorso = [parte] + voce.percorso` se la voce esiste, `metadati` con `urn, eli, parte, articolo, rubrica, abrogato ("si"/"no"), data_vigenza`, `breve_ammesso = abrogato`, commi separati da `"\n\n"`.
-  - `cfg` propri: `vigenza` (`AAAAMMGG`, predefinito oggi). `versione` = `data_consolidamento` (dall'alias ELI `CONSOLIDATED/<data>`, letto con `rete.get(..., fresca=True)`). `attesi` = id dagli allegati AKN. `casi_limite` = un abrogato, un `-bis`, il più lungo, i due art. 1.
-  - `contratto.json`: config con `url` ELI del Codice civile e `vigenza: "20261111"`, `rete` con gli URL AKN, pagina atto e `caricaArticolo` dell'art. 1399 → file delle fixture, `campione` con `akn-indice` e `akn`: `["cc-art-1", "preleggi-art-1", "cc-art-42-bis", "cc-art-1399", "cc-art-1401", <id dell'abrogato in fixture>]`, `html-articolo`: `["cc-art-1399"]`.
+  - `@dataclass class Ricognizione: url: str; status: int; content_type: str; byte: int; titolo: str; adattatore: str | None; formati: dict[str, list[str]]  # "xml"/"pdf"/"json"/"csv"/"docx"/"zip"/"rss" -> fino a 5 URL assoluti; elenchi: list[dict]  # gruppi di link ripetuti con stesso schema di URL: {"schema": str, "quanti": int, "esempi": [3 URL]}; struttura: dict[str, int]  # conteggi h1/h2/h3/table/article/form/script; data_trovata: str | None; testo_campione: str  # primi 600 caratteri del testo principale; avvisi: list[str]`
+  - `ricognisci(rete: Rete, url: str) -> Ricognizione` — HTML: BeautifulSoup; link raggruppati per schema (percorso con numeri e id sostituiti da `{n}`, query ordinate senza valori); avvisi per: status ≠ 200, pagina quasi vuota (< 500 caratteri di testo) con molti `script` (probabile JavaScript), login/form di accesso, robots `noindex`. XML: radice e conteggio dei figli ripetuti come `elenchi`. PDF/altro: solo tipo e byte.
+  - CLI `python3 esplora_fonte.py --url <url> [--out <dir>]`: rete con cache in `<dir>/raw/`, scrive `<dir>/ricognizione.json`, stampa ≤ 15 righe (adattatore trovato o "da scrivere", formati, i 5 elenchi più numerosi, avvisi).
 
-- [ ] **Step 1: Write the failing tests** (`test_akn.py`, sulla fixture AKN)
+- [ ] **Step 1: Write the failing tests**
 
 ```python
-def test_meta(self):
-    a = akn.parse_akn(FIX)
-    self.assertEqual(a.urn_nir, "urn:nir:stato:regio.decreto:1942-03-16;262")
-    self.assertRegex(a.data_consolidamento, r"^\d{4}-\d{2}-\d{2}$")   # dall'ELI, non dal FRBRdate 1944-11-10
+def test_formati_e_elenchi(self):
+    html = "<html><head><title>Atti</title></head><body><h1>Atti</h1>" + "".join(
+        f'<a href="/atto/{i}/dettaglio?id={i}">Atto {i}</a>' for i in range(40)) + '<a href="/export/tutto.xml">XML</a></body></html>'
+    r = e.ricognisci(rete_finta({"http://x/": html}), "http://x/")
+    self.assertEqual(r.titolo, "Atti")
+    self.assertEqual(r.formati["xml"], ["http://x/export/tutto.xml"])
+    self.assertEqual(r.elenchi[0]["quanti"], 40)
+    self.assertIsNone(r.adattatore)
 
-def test_art1_doppio_id_distinti(self):                 # Review Focus 1
-    ids = [u.id for u in NORMATTIVA.unita(RETE, CFG, "akn")]
-    self.assertIn("cc-art-1", ids); self.assertIn("preleggi-art-1", ids)
-    self.assertEqual(len(ids), len(set(ids)))
+def test_avviso_javascript(self):
+    html = "<html><body>" + "<script>x()</script>" * 10 + "<div id=app></div></body></html>"
+    self.assertTrue(any("JavaScript" in a for a in e.ricognisci(rete_finta({"http://x/": html}), "http://x/").avvisi))
 
-def test_rubrica_e_testo_1399(self):
-    a = next(x for x in akn.parse_akn(FIX).articoli if x.num == "1399")
-    self.assertEqual(a.rubrica, "Ratifica")
-    self.assertTrue(a.testo.startswith("Nell'ipotesi prevista dall'articolo precedente"))
-    self.assertNotRegex(a.testo, r"\(\(\d+\)\)")
-
-def test_bis_e_abrogato(self):                          # Review Focus 2
-    u = {x.id: x for x in NORMATTIVA.unita(RETE, CFG, "akn")}
-    self.assertIn("cc-art-42-bis", u)
-    ab = next(x for x in u.values() if x.metadati["abrogato"] == "si")
-    self.assertTrue(ab.breve_ammesso); self.assertGreater(len(ab.testo), 0)
-
-def test_percorso_dall_indice(self):
-    u = {x.id: x for x in NORMATTIVA.unita(RETE, CFG, "akn-indice", solo={"cc-art-1401"})}
-    self.assertTrue(u["cc-art-1401"].percorso[-1].startswith("CAPO VII"))
+def test_xml_elenchi(self):
+    xml = "<root>" + "<voce><t>a</t></voce>" * 12 + "</root>"
+    r = e.ricognisci(rete_finta({"http://x/a.xml": xml}, ctype="text/xml"), "http://x/a.xml")
+    self.assertEqual((r.elenchi[0]["schema"], r.elenchi[0]["quanti"]), ("root/voce", 12))
 ```
 
-- [ ] **Step 2:** `python3 -m unittest test_akn test_contratto -v` → FAIL
-- [ ] **Step 3:** implementare `parse_akn` (un `attachment/doc` = un articolo; `parte` e `num` dal `@name` `"<PARTE>-art. <num>"`; rubrica = testo tra parentesi dopo "Art. N." in testa; `abrogato` se entro 300 caratteri dopo la rubrica il testo è dominato da "abrogat"/"((ARTICOLO ABROGATO"), poi `Normattiva` e la registrazione
-- [ ] **Step 4:** → PASS (anche `test_normattiva`)
-- [ ] **Step 5:** `git commit -m "adattatore normattiva: articoli dall'AKN, formati e test di contratto"`
+- [ ] **Step 2:** → FAIL · **Step 3:** implementare · **Step 4:** → PASS
+- [ ] **Step 5:** `git commit -m "esplora_fonte: ricognizione compatta di una fonte"`
 
-### Task 4: Misura dei formati (fase 3)
+### Task 3: Misura dei formati (fase 3)
 
 **Files:**
 - Create: `loader/misura_formati.py`
@@ -202,7 +164,7 @@ def test_breve_ammesso_non_vuoto(self):
 - [ ] **Step 2:** → FAIL · **Step 3:** implementare · **Step 4:** → PASS
 - [ ] **Step 5:** `git commit -m "misura_formati: confronto misurato dei formati di una fonte"`
 
-### Task 5: Estrazione generica, un file per unità
+### Task 4: Estrazione generica, un file per unità
 
 **Files:**
 - Create: `loader/estrai.py`
@@ -278,14 +240,14 @@ def test_carica_docsgpt_vede_i_file(self):
 - [ ] **Step 2:** → FAIL · **Step 3:** implementare `estrai.py` e la modifica a `carica_docsgpt.py` · **Step 4:** → PASS, e `python3 -m unittest test_downloader` → PASS
 - [ ] **Step 5:** `git commit -m "estrai: un file per unità con percorso, divisione e aggiornamento incrementale"`
 
-### Task 6: Valutazione dei link (fase 4) e test di qualità (fase 5)
+### Task 5: Valutazione dei link (fase 4) e test di qualità (fase 5)
 
 **Files:**
 - Create: `loader/valuta_link.py`, `loader/qualita_estrazione.py`
 - Test: `loader/test_qualita.py`
 
 **Interfaces:**
-- Consumes: manifest e file del Task 5, Task 1, `misura_formati.campione`
+- Consumes: manifest e file del Task 4, Task 1, `misura_formati.campione`
 - Produces:
   - `precisione(pagina: str, unita: Unita, vicine: list[Unita]) -> str` — `"unita"` se titolo e prime 8 parole del testo sono nella pagina e nessuna delle `vicine` (prime 8 parole) lo è; `"atto"` se ci sono anche le vicine; `"assente"` altrimenti. Confronto sul testo della pagina senza tag e con spazi normalizzati.
   - `valuta_link(ad: Adattatore, unita: list[Unita], campione: list[str], rete: Rete) -> dict[str, dict]` — per ogni candidato in `ad.candidati_link`: `{"status_200": %, "unita": %, "atto": %, "assente": %, "byte_medi": int}`; `"locale"` ha sempre precisione `"unita"`. Vicine = unità precedente e successiva nell'ordine di `unita`. CLI `python3 valuta_link.py --target --id`: scrive `<cartella>/link.json`, stampa la tabella candidato × misure.
@@ -325,7 +287,7 @@ def test_precisione_unita(self):
 - [ ] **Step 2:** → FAIL · **Step 3:** implementare · **Step 4:** → PASS
 - [ ] **Step 5:** `git commit -m "qualita: valutazione dei link e test di qualità dell'estrazione"`
 
-### Task 7: Caricamento in prova, benchmark della fonte, promozione, notifier
+### Task 6: Caricamento in prova, benchmark della fonte, promozione, notifier
 
 **Files:**
 - Create: `loader/prova_fonte.py`
@@ -369,7 +331,7 @@ def test_create_agent_payload(self):
 - [ ] **Step 6:** `python3 -c "import ast; ast.parse(open('notifier/notifier.py').read())"` e `docker compose config -q` → nessun errore
 - [ ] **Step 7:** `git commit -m "prova_fonte: caricamento in prova, benchmark della fonte, promozione e notifier"`
 
-### Task 8: Skill `/nuova-fonte`, sottoagenti, modelli
+### Task 7: Skill `/nuova-fonte`, sottoagenti, modelli
 
 **Files:**
 - Create: `.claude/skills/nuova-fonte/SKILL.md`
@@ -379,7 +341,7 @@ def test_create_agent_payload(self):
 - Modify: `loader/adattatori/_modello.py` se la skill ne cita parti mancanti
 
 **Interfaces:**
-- Consumes: le CLI dei Task 4–7, `test_contratto.py`, `adattatori/_modello.py`
+- Consumes: le CLI dei Task 2–6, `test_contratto.py`, `adattatori/_modello.py`
 - Produces: la skill con, per ogni fase della spec: input, comando, criterio di uscita, regola di decisione, valore predefinito, cosa scrivere nel rapporto. In particolare:
   - fase 1: `python3 -c "import adattatori; print(adattatori.trova('<url>'))"` decide riuso o scrittura;
   - fase 2, scrittura: salvare in `loader/fixtures/<nome>/` le risposte per 5–10 unità inclusi i casi difficili visti, copiare `_modello.py` in `adattatori/<nome>.py`, scrivere `contratto.json` e `test_<nome>.py`, registrare; esce con `python3 -m unittest test_contratto test_<nome>` PASS;
@@ -400,7 +362,7 @@ questa: sono la prova che la skill funziona da sola.
 
 **Collaudo 1, Codice civile:**
 `/nuova-fonte importa il Codice civile da https://www.normattiva.it/eli/id/1942/04/04/042U0262`
-- fase 1 trova l'adattatore `normattiva` (riuso, nessun codice nuovo);
+- fase 1 non trova adattatori: la pipeline scrive `adattatori/normattiva.py` con fixture e test e passa `test_contratto.py` senza aiuto (una bozza manuale è archiviata in `.superpowers/sdd/2026-11-11-pipeline-ingestion/bozza-normattiva/`: **non** va data alla sessione di collaudo, serve solo a confrontare dopo);
 - domande all'utente al massimo all'avvio e all'approvazione;
 - `qualita_estrazione.py` tutto OK (3.281 unità attese = 3.250 c.c. + 31 preleggi, salvo variazioni della data di vigenza riportate nel rapporto);
 - `prova_fonte.py bench` PASS su 8 domande `codice-civile-*` (2 riferimenti esatti incluso art. 1 preleggi contro art. 1 c.c., 2 parafrasi, 1 numeri vicini 1398/1399, 1 rubrica senza numero, 1 articolo `-bis`, 1 abrogato);

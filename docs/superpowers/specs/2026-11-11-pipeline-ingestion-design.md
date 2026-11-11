@@ -159,7 +159,7 @@ indicata dal test, poi si ferma e riporta.
 | # | Fase | Chi la fa | Modello |
 |---|---|---|---|
 | 0 | Richiesta | utente | — |
-| 1 | Verifica della fonte e scelta dell'adattatore | agente | Sonnet |
+| 1 | Ricognizione della fonte (`esplora_fonte.py`) e scelta dell'adattatore | script + agente | Sonnet |
 | 2 | Adattatore (riuso, oppure scrittura + test di contratto) | agente scrive codice | Sonnet |
 | 3 | Confronto dei formati | script + agente decide | Sonnet; Opus solo se i criteri sono in conflitto |
 | 4 | Divisione e link | script + agente decide | Sonnet |
@@ -242,8 +242,8 @@ prova si cancella.
 
 ## Primo caso d'uso: Codice civile da Normattiva
 
-L'adattatore `normattiva` è il primo scritto con l'interfaccia; serve da
-esempio per i successivi. Già osservato, da confermare con le misure:
+Nessun adattatore si scrive a mano: anche il primo, `normattiva`, lo scrive la
+pipeline nel collaudo, partendo dalla sola richiesta. È la prova della fase 2. Già osservato, da confermare con le misure:
 - AKN vigente (`/do/atto/caricaAKN?dataGU=…&codiceRedaz=…&dataVigenza=…`): una
   richiesta, 10,6 MB, 3.281 allegati = articoli (3.250 c.c. + 31 preleggi),
   testo pulito salvo i marcatori `((n))`; **gerarchia assente**; data vera
