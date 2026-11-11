@@ -80,9 +80,25 @@ def locazioni_names(path: Path) -> dict[str, str]:
     return {f"locazioni/{s['id']}": s.get("nome") or f"Locazioni - {s['id']}" for s in data.get("sorgenti") or []}
 
 
+def pipeline_names(path: Path) -> dict[str, str]:
+    """Fonti della pipeline /nuova-fonte: cartella <gruppo>/<id> -> nome della sorgente."""
+    try:
+        import yaml
+    except ImportError:
+        return {}
+    if not path.exists():
+        return {}
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return {f"{s['gruppo']}/{s['id']}": s["nome"] for s in data.get("sorgenti") or [] if s.get("gruppo") and s.get("id")}
+
+
 SOURCE_NAMES.update(locazioni_names(Path(__file__).resolve().parent / "fonti" / "locazioni.yaml"))
-# --source locazioni = tutte le sorgenti locazioni/<id>.
+PIPELINE_NAMES = pipeline_names(Path(__file__).resolve().parent / "fonti" / "pipeline.yaml")
+SOURCE_NAMES.update(PIPELINE_NAMES)
+# --source locazioni = tutte le sorgenti locazioni/<id>; --source <gruppo> = le fonti della pipeline del gruppo.
 GROUPS = {"locazioni": [e for e in SOURCE_NAMES if e.startswith("locazioni/")]}
+for _e in PIPELINE_NAMES:
+    GROUPS.setdefault(_e.split("/", 1)[0], []).append(_e)
 
 # Stessa configurazione usata per i primi caricamenti manuali.
 SOURCE_CONFIG = {
