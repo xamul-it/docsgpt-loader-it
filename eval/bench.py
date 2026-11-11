@@ -1,6 +1,6 @@
 # Benchmark di search_docs: eseguito dentro il container backend, legge le domande
 # (JSON) da stdin e stampa una riga JSONL per domanda e modalità.
-#   A = solo la domanda;  B = domanda + keywords (KW, come le passerebbe Claude).
+#   A = solo la domanda;  B = domanda + keywords (campo keywords della domanda o KW, come le passerebbe Claude).
 # Uso (dalla radice del repository):
 #   python3 -c "import yaml,json;json.dump(yaml.safe_load(open('eval/domande.yaml')),open('/tmp/d.json','w'))"
 #   KEY=$(docker exec docsgpt-postgres-1 psql -U docsgpt -d docsgpt -Atc \
@@ -20,9 +20,11 @@ KW = {
  'loc-01':'"imposta di soggiorno" Bologna 2026','loc-02':'CIN sanzione annuncio','loc-03':'CIN CIR "Emilia-Romagna"',
  'fil-01':'"concordato preventivo biennale" "associazione professionale"'}
 key = os.environ['AGENT_KEY']; qs = json.load(sys.stdin)['domande']
+# SOLO_PREFISSO=<id fonte>-: solo le domande di una fonte (prova_fonte.py bench).
+qs = [q for q in qs if q['id'].startswith(os.environ.get('SOLO_PREFISSO', ''))]
 for q in qs:
     for mode in ('A', 'B'):
-        kw = KW.get(q['id']) if mode == 'B' else None
+        kw = (q.get('keywords') or KW.get(q['id'])) if mode == 'B' else None
         t = time.time()
         try: res = search_documents(key, q['domanda'], 10, kw); err = None
         except Exception as e: res, err = [], repr(e)
