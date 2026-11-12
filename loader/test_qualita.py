@@ -149,6 +149,31 @@ class AccordoTest(unittest.TestCase):              # I5
             esiti = {x.nome: x for x in q.controlla_fonte(tmp, CFG)}
         self.assertFalse(esiti["riscontro_link"].ok)
 
+    def _riscontro(self, pagina):
+        tmp = Path(tempfile.mkdtemp())
+        ad = AdattatoreFinto()
+        ad.formati = ("intero",)
+        d = fonte.cartella(tmp, CFG)
+        estrai.scrivi_unita(ad.unita(fonte.Rete(None), CFG, "intero"), CFG, d, "v1")
+        with registrato(ad), mock.patch("qualita_estrazione.Rete", return_value=ReteFinta(pagina)):
+            return {x.nome: x for x in q.controlla_fonte(tmp, CFG)}["riscontro_link"]
+
+    def test_riscontro_link_pagina_dinamica_e_avviso(self):
+        # Testo caricato via JavaScript: non verificabile senza browser -> avviso, non blocca.
+        e = self._riscontro("<html><head><script src='app.js'></script></head><body><div id='testo'></div></body></html>")
+        self.assertTrue(e.ok)
+        self.assertIn("JavaScript", e.avviso)
+        self.assertTrue(e.esempi)
+
+    def test_riscontro_link_pagina_sbagliata_resta_fail(self):
+        # Pagina con script che mostra tutte le unità tranne... nessuna: è l'atto
+        # intero senza titoli giusti -> non dinamica, le vicine ci sono -> FAIL.
+        ad = AdattatoreFinto()
+        tutte = ad.unita(fonte.Rete(None), CFG, "intero")
+        e = self._riscontro("<html><script>x()</script><body>" + " ".join(f"<p>{u.testo}</p>" for u in tutte) + "</body></html>")
+        self.assertFalse(e.ok)
+        self.assertEqual(e.avviso, "")
+
 
 class ReteFinta:
     richieste_rete = byte_rete = 0
@@ -173,6 +198,22 @@ class LinkTest(unittest.TestCase):
     def test_precisione_unita(self):
         pagina = f"<html><body><h1>{TRE[1].titolo}</h1><p>{TRE[1].testo}</p></body></html>"
         self.assertEqual(v.precisione(pagina, TRE[1], [TRE[0], TRE[2]]), "unita")
+
+    def test_precisione_titolo_composto(self):
+        u = Unita("cc-1418", "Codice civile, art. 1418 - Cause di nullità del contratto", [],
+                  "Il contratto è nullo quando è contrario a norme imperative, salvo che la legge disponga diversamente.",
+                  {}, {}, False)
+        pagina = f"<html><body><p>Codice civile</p><h2>Art. 1418. (Cause di nullità del contratto).</h2><p>{u.testo}</p></body></html>"
+        self.assertEqual(v.precisione(pagina, u, []), "unita")
+        self.assertEqual(v.precisione(pagina.replace("1418", "1419"), u, []), "assente")
+
+    def test_precisione_dinamica(self):
+        pagina = "<html><script src='a.js'></script><body>Caricamento…</body></html>"
+        self.assertEqual(v.precisione(pagina, TRE[1], [TRE[0], TRE[2]]), "dinamica")
+        senza_script = "<html><body>Caricamento…</body></html>"
+        self.assertEqual(v.precisione(senza_script, TRE[1], [TRE[0], TRE[2]]), "assente")
+        pagina_vicina = f"<html><script></script><body>{TRE[0].titolo} {TRE[0].testo}</body></html>"
+        self.assertEqual(v.precisione(pagina_vicina, TRE[1], [TRE[0], TRE[2]]), "assente")
 
     def test_precisione_assente(self):
         self.assertEqual(v.precisione("<html>Pagina di errore</html>", TRE[1], [TRE[0]]), "assente")

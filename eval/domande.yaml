@@ -179,3 +179,68 @@ domande:
     - agenzia-entrate/interpelli/files/2026/2026-02-24_Interpello_48_*
   fatti: ["almeno le risposte 100/2026 e 48/2026"]
   trappola: "Includere circolari o interpelli di anni precedenti; con max_documents=10 l'elenco può essere incompleto."
+
+# --- Codice civile (fonte codici/codice-civile) -----------------------------
+- id: codice-civile-01
+  categoria: riferimento-esatto
+  domanda: "Cosa dice l'art. 2043 del codice civile?"
+  attesi: [codici/codice-civile/files/codice-civile-art-2043.html]
+  keywords: '"2043" "fatto illecito"'
+  fatti: ["fatto doloso o colposo che cagiona ad altri un danno ingiusto", "obbliga a risarcire il danno"]
+  trappola: "Confondere con 2049 (padroni e committenti) o 2050 (attività pericolose)."
+
+- id: codice-civile-02
+  categoria: parafrasi
+  domanda: "Un contratto contrario a norme imperative è valido? Quando un contratto è nullo?"
+  attesi: [codici/codice-civile/files/codice-civile-art-1418.html]
+  keywords: '"nullo" "norme imperative" "illiceità della causa"'
+  fatti: ["il contratto è nullo quando è contrario a norme imperative, salvo che la legge disponga diversamente", "nullità per mancanza dei requisiti dell'art. 1325, illiceità della causa, dei motivi (art. 1345), mancanza dei requisiti dell'oggetto (art. 1346)"]
+  trappola: "Citare l'annullabilità (art. 1425 ss.) invece della nullità."
+
+- id: codice-civile-03
+  categoria: numeri-vicini
+  domanda: "Se uno svolge un'attività pericolosa e causa un danno, come può evitare di risarcire? Art. 2050 c.c."
+  attesi: [codici/codice-civile/files/codice-civile-art-2050.html]
+  keywords: '"2050" "attività pericolosa" "misure idonee"'
+  fatti: ["attività pericolosa per sua natura o per la natura dei mezzi adoperati", "risarcimento dovuto se non prova di aver adottato tutte le misure idonee a evitare il danno"]
+  trappola: "Rispondere con il 2043 (colpa generica) o il 2051 (cose in custodia), vicini per numero e materia."
+
+- id: codice-civile-04
+  categoria: titolo-senza-numero
+  domanda: "Cosa prevede il codice civile sull'onere della prova?"
+  attesi: [codici/codice-civile/files/codice-civile-art-2697.html]
+  keywords: '"onere della prova" "fatti che ne costituiscono il fondamento"'
+  fatti: ["chi vuol far valere un diritto in giudizio deve provare i fatti che ne costituiscono il fondamento", "chi eccepisce l'inefficacia di tali fatti o la modifica/estinzione del diritto deve provare i fatti su cui l'eccezione si fonda"]
+  trappola: "Rispondere con norme del codice di procedura civile."
+
+- id: codice-civile-05
+  categoria: articolo-bis
+  domanda: "Un'associazione riconosciuta può trasformarsi o fondersi con un'altra? Art. 42-bis c.c."
+  attesi: [codici/codice-civile/files/codice-civile-art-42-bis.html]
+  keywords: '"42-bis" "trasformazione" "fusione" "scissione"'
+  fatti: ["associazioni riconosciute e non riconosciute e fondazioni possono operare reciproche trasformazioni, fusioni o scissioni", "salvo che sia espressamente escluso dall'atto costitutivo o dallo statuto", "la trasformazione produce gli effetti di cui all'articolo 2498"]
+  trappola: "Fermarsi all'art. 42 o confondere con la trasformazione delle società (2498 ss.)."
+
+- id: codice-civile-06
+  categoria: disposizioni-preliminari
+  domanda: "Come va interpretata la legge secondo le preleggi? Cosa si fa se un caso non è previsto da nessuna norma?"
+  attesi: [codici/codice-civile/files/disposizioni-sulla-legge-in-generale-art-12.html]
+  keywords: '"interpretazione della legge" "significato proprio delle parole" "intenzione del legislatore"'
+  fatti: ["alla legge non si può attribuire altro senso che quello fatto palese dal significato proprio delle parole secondo la connessione di esse e dall'intenzione del legislatore", "in caso di lacuna si ricorre ai casi simili o materie analoghe (analogia)", "se il caso resta dubbio si decide secondo i principi generali dell'ordinamento giuridico dello Stato"]
+  trappola: "Citare l'art. 1362 c.c. (interpretazione del contratto) o l'art. 14 delle preleggi (applicazione delle leggi penali ed eccezionali)."
+
+- id: codice-civile-07
+  categoria: articolo-lungo-diviso
+  domanda: "Quando i condomini sono più di otto e l'assemblea non nomina l'amministratore, chi lo nomina?"
+  attesi: [codici/codice-civile/files/codice-civile-art-1129-p1.html]
+  keywords: '"amministratore" "più di otto" "autorità giudiziaria"'
+  fatti: ["quando i condomini sono più di otto e l'assemblea non provvede, la nomina è fatta dall'autorità giudiziaria", "su ricorso di uno o più condomini o dell'amministratore dimissionario"]
+  trappola: "Rispondere con il solo art. 1130 (attribuzioni) o con la parte 2/3 dell'art. 1129 (revoca, compenso)."
+
+- id: codice-civile-08
+  categoria: articolo-abrogato
+  domanda: "Cosa stabiliva l'art. 314/2 del codice civile?"
+  attesi: [codici/codice-civile/files/codice-civile-art-314-2.html]
+  keywords: '"314/2" abrogato'
+  fatti: ["articolo abrogato dalla l. 4 maggio 1983, n. 184"]
+  trappola: "Inventare un contenuto: la pagina riporta solo l'abrogazione; la risposta corretta è che è abrogato (adozione di maggiori di età, legge 184/1983)."

@@ -43,11 +43,23 @@ def chiave(u: Unita) -> str:
     return " ".join(normalizza(u.testo).split()[:PAROLE_CHIAVE])
 
 
+def titolo_presente(titolo: str, t: str) -> bool:
+    """Il titolo c'è se ci sono tutte le sue parole: l'adattatore lo compone
+    (es. "Codice civile, art. 1418 - Cause di nullità del contratto") e il sito
+    lo scrive in un altro ordine e punteggiatura ("Art. 1418. (Cause di …)")."""
+    parole = set(re.findall(r"\w+", t))
+    return all(p in parole for p in re.findall(r"\w+", normalizza(titolo)))
+
+
 def precisione(pagina: str, unita: Unita, vicine: list[Unita]) -> str:
     """"unita" se la pagina contiene titolo e inizio del testo dell'unità e non
-    quelli delle vicine; "atto" se contiene anche le vicine; altrimenti "assente"."""
+    quelli delle vicine; "atto" se contiene anche le vicine; "dinamica" se la
+    pagina ha script e non contiene né l'unità né le vicine (il testo arriva
+    via JavaScript: senza browser non si può verificare); altrimenti "assente"."""
     t = testo_pagina(pagina)
-    if not (normalizza(unita.titolo) in t and chiave(unita) in t):
+    if not (titolo_presente(unita.titolo, t) and chiave(unita) in t):
+        if re.search(r"<script\b", pagina, re.I) and not any(chiave(x) in t for x in vicine):
+            return "dinamica"
         return "assente"
     return "atto" if any(chiave(x) in t for x in vicine) else "unita"
 
@@ -55,12 +67,12 @@ def precisione(pagina: str, unita: Unita, vicine: list[Unita]) -> str:
 def valuta_link(ad, unita: list[Unita], scelti: list[str], rete) -> dict[str, dict]:
     pos = {u.id: i for i, u in enumerate(unita)}
     righe = [u for u in unita if u.id in set(scelti)]
-    out = {"locale": {"status_200": 100.0, "unita": 100.0, "atto": 0.0, "assente": 0.0,
+    out = {"locale": {"status_200": 100.0, "unita": 100.0, "atto": 0.0, "dinamica": 0.0, "assente": 0.0,
                       "byte_medi": round(sum(len(u.testo) for u in righe) / max(1, len(righe)))}}
     for cand in ad.candidati_link:
-        conta = {"status_200": 0, "unita": 0, "atto": 0, "assente": 0}
+        conta = {"status_200": 0, "unita": 0, "atto": 0, "dinamica": 0, "assente": 0}
         byte = 0
-        esempi = []
+        esempi, esempi_dinamica = [], []
         for u in righe:
             url = u.link_ufficiali.get(cand, "")
             i = pos[u.id]
@@ -75,10 +87,13 @@ def valuta_link(ad, unita: list[Unita], scelti: list[str], rete) -> dict[str, di
             conta[p] += 1
             if p == "assente" and len(esempi) < 3:
                 esempi.append(f"{u.id}: {url or '(senza link)'}")
+            if p == "dinamica" and len(esempi_dinamica) < 3:
+                esempi_dinamica.append(f"{u.id}: {url}")
         n = max(1, len(righe))
         out[cand] = {k: round(100.0 * c / n, 1) for k, c in conta.items()}
         out[cand]["byte_medi"] = round(byte / max(1, conta["status_200"]))
         out[cand]["esempi_assenti"] = esempi
+        out[cand]["esempi_dinamica"] = esempi_dinamica
     return out
 
 
@@ -95,10 +110,11 @@ def valuta_fonte(archivio: Path, cfg: dict, n: int = 10) -> dict[str, dict]:
 
 
 def tabella(r: dict[str, dict]) -> list[str]:
-    righe = [f"{'candidato':<20} {'200%':>6} {'unità%':>7} {'atto%':>6} {'assente%':>8} {'byte medi':>10}"]
+    righe = [f"{'candidato':<20} {'200%':>6} {'unità%':>7} {'atto%':>6} {'dinam%':>6} {'assente%':>8} {'byte medi':>10}"]
     for k, m in r.items():
-        righe.append(f"{k:<20} {m['status_200']:>6} {m['unita']:>7} {m['atto']:>6} {m['assente']:>8} {m['byte_medi']:>10}")
+        righe.append(f"{k:<20} {m['status_200']:>6} {m['unita']:>7} {m['atto']:>6} {m.get('dinamica', 0.0):>6} {m['assente']:>8} {m['byte_medi']:>10}")
         righe += [f"    assente: {e}" for e in m.get("esempi_assenti", [])[:1]]
+        righe += [f"    dinamica (testo via JavaScript, serve un browser): {e}" for e in m.get("esempi_dinamica", [])[:1]]
     return righe[:15]
 
 

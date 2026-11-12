@@ -36,6 +36,7 @@ class Esito:
     soglia: float
     ok: bool
     esempi: list[str] = field(default_factory=list)
+    avviso: str = ""      # ok ma non verificato del tutto: va riportato, non blocca
 
 
 def _testo_file(path: Path) -> str:
@@ -140,7 +141,14 @@ def controlla_fonte(archivio: Path, cfg: dict, n: int = 10) -> list[Esito]:
         cand = cfg["link"].split(":", 1)[-1] if cfg["link"] != "locale" else ad.candidati_link[0]
         r = valuta_link(ad, tutte, scelti[:5], rete)[cand]
         ok = r["status_200"] == 100.0 and r["assente"] == 0.0
-        esiti.append(_esito("riscontro_link", r["status_200"] / 100, 1.0, ok, r.get("esempi_assenti", [])))
+        e = _esito("riscontro_link", r["status_200"] / 100, 1.0, ok, r.get("esempi_assenti", []))
+        if ok and r.get("dinamica"):
+            # Pagina che carica il testo via JavaScript: senza browser non si
+            # verifica. Avviso, non errore: il link va controllato a mano.
+            e.esempi = r.get("esempi_dinamica", [])
+            e.avviso = (f"non verificabile su {r['dinamica']}% del campione: il testo arriva via JavaScript, "
+                        "serve un browser (controllare i link a mano)")
+        esiti.append(e)
     return esiti
 
 
@@ -160,8 +168,10 @@ def main(argv: list[str] | None = None) -> int:
     (base / "qualita.json").write_text(json.dumps(
         {"manifest": fonte.impronta(base), "esiti": [e.__dict__ for e in esiti]}, ensure_ascii=False, indent=1))
     for e in esiti:
-        print(f"{'OK  ' if e.ok else 'FAIL'} {e.nome:<26} {e.valore:<8} soglia {e.soglia:<5} "
-              + (f"es. {', '.join(e.esempi)}"[:110] if e.esempi and not e.ok else ""))
+        stato = "FAIL" if not e.ok else "WARN" if e.avviso else "OK  "
+        print(f"{stato} {e.nome:<26} {e.valore:<8} soglia {e.soglia:<5} "
+              + (f"es. {', '.join(e.esempi)}"[:110] if e.esempi and not e.ok else "")
+              + (f"{e.avviso}; es. {', '.join(e.esempi)}"[:200] if e.avviso else ""))
     return 0 if all(e.ok for e in esiti) else 1
 
 

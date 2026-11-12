@@ -26,3 +26,8 @@ def adattatore(nome: str) -> Adattatore:
 def trova(url: str) -> Adattatore | None:
     """Il primo adattatore che riconosce l'URL, o None (= da scrivere)."""
     return next((ad for ad in REGISTRO.values() if ad.riconosce(url)), None)
+
+
+from adattatori.normattiva import Normattiva  # noqa: E402
+
+registra(Normattiva())

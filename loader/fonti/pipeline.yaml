@@ -14,4 +14,15 @@
 #     provvisorio: true              # finché non è promossa: ignorata da carica_docsgpt e notifier
 #     # … parametri propri dell'adattatore (es. vigenza)
 
-sorgenti: []
+sorgenti:
+  - id: codice-civile
+    gruppo: codici
+    nome: "Codice civile"
+    adattatore: normattiva
+    url: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262"
+    formato: articolo
+    link: locale
+    soglia_caratteri: 2400
+    ente: "Normattiva"
+    tipo_documento: "codice"
+    casi_limite: ["codice-civile-art-2426", "codice-civile-art-3"]   # l'articolo più lungo e uno abrogato
