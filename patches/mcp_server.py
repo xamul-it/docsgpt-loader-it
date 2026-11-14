@@ -130,9 +130,13 @@ async def search_docs(
     della fonte), ente, url (link pubblico al documento originale: citalo
     sempre come link), similarity (similarità semantica 0-1 del passaggio
     migliore, se trovato per significato) e passages: i frammenti
-    pertinenti, ciascuno con found_by ("semantica", "parole chiave" o
-    "entrambe") e similarity. I risultati sono già ordinati per pertinenza
-    complessiva.
+    pertinenti, ciascuno con found_by ("semantica", "parole chiave",
+    "entrambe" o "riferimento") e similarity. I risultati sono già ordinati
+    per pertinenza complessiva. Se la domanda o le keywords citano un atto
+    per tipo, numero e anno ("circolare 21/E del 2016", "d.lgs. 472/1997"),
+    l'atto viene per primo con found_by "riferimento". Se manca, l'atto non
+    è nell'archivio: non usare al suo posto un documento con lo stesso
+    numero.
     """
     api_key = _require_key()
     try:

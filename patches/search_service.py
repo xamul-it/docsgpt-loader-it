@@ -581,6 +581,114 @@ def _keyword_hits(docsearch: Any, source_id: str, text: str, k: int) -> List[tup
     return hits
 
 
+# ---------------------------------------------------------------------------
+# Explicit references ("circolare 21/E del 2016", "d.lgs. 472/1997"), issue #5.
+# The full-text half cannot tell the document that *is* circolare 21/E 2016
+# from the dozens that cite it, but the loader names every file
+# "<date>_<Type>_<number>_<title>", so the cited act is found by its path.
+# Its first passage goes on top of the results, found_by "riferimento".
+# ---------------------------------------------------------------------------
+
+# (pattern, type as written in the file names); decreto-legge before legge.
+_REF_TYPES = (
+    (r"decreto[\s-]+legge|d\.\s?l\.|dl", "Decreto-legge"),
+    (r"decreto\s+legislativo|d\.\s?lgs\.?|dlgs\.?", "Decreto_legislativo"),
+    (r"decreto\s+del\s+presidente\s+della\s+repubblica|d\.\s?p\.\s?r\.?|dpr",
+     "Decreto_del_Presidente_della_Repubblica"),
+    (r"circolar[ei]|circ\.", "Circolare"),
+    (r"risoluzion[ei]|ris\.", "Risoluzione"),
+    (r"rispost[ae]\s+(?:ad?\s+)?interpell[oi]|interpell[oi]|rispost[ae]", "Interpello"),
+    (r"comunicat[oi]\s+stampa|comunicat[oi]", "Comunicato_Stampa"),
+    (r"sentenz[ae]|sent\.", "Sentenza"),
+    (r"ordinanz[ae]|ord\.", "Ordinanza"),
+    (r"legge|l\.", "Legge"),
+)
+_REF_RE = _re.compile(
+    r"(?<![\w.])(?:" + "|".join(f"(?P<t{i}>{p})" for i, (p, _) in enumerate(_REF_TYPES)) + r")"
+    r"(?![a-zà-ù])\s*(?:n(?:um(?:ero)?)?\s*[.°º]?\s*)?"
+    r"(?P<num>\d{1,6})(?![\d,]|\.\d)"
+    r"(?:\s*/\s*(?P<lett>[a-z])(?![a-z]))?"
+    r"(?:\s*/\s*(?P<anno>(?:19|20)\d{2})(?!\d))?",
+    _re.I,
+)
+_YEAR_RE = _re.compile(r"(?<!\d)((?:19|20)\d{2})(?!\d)")
+# How far after the number the year may be: "21/E del 25 maggio 2016".
+_REF_YEAR_WINDOW = 40
+_REF_MAX = 3
+_REF_MAX_DOCS = 5
+
+
+def _parse_references(text: str) -> List[Dict[str, Optional[str]]]:
+    """Acts cited by type and number (and year, when given) in ``text``."""
+    matches = list(_REF_RE.finditer(text or ""))
+    refs: List[Dict[str, Optional[str]]] = []
+    for i, m in enumerate(matches):
+        tipo = next(_REF_TYPES[int(g[1:])][1] for g, v in m.groupdict().items() if g.startswith("t") and v)
+        anno = m.group("anno")
+        if not anno:
+            # The year may follow ("del 2016", "del 25/5/2016"), up to the next reference.
+            end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+            y = _YEAR_RE.search(text[m.end():min(end, m.end() + _REF_YEAR_WINDOW)])
+            anno = y.group(1) if y else None
+        lett = m.group("lett")
+        ref = {"tipo": tipo, "numero": m.group("num"), "lettera": lett.upper() if lett else None, "anno": anno}
+        if ref not in refs:
+            refs.append(ref)
+    return refs[:_REF_MAX]
+
+
+def _reference_path_regex(ref: Dict[str, Optional[str]]) -> str:
+    """Postgres regex on the document path: "2016-05-25_Circolare_21_..." for circolare 21/E 2016.
+
+    The Agenzia delle Entrate names its acts "21/E" but its files carry the
+    bare number; ADM files keep the letter ("Circolare_78-D_").
+    """
+    year = ref["anno"] or "[0-9]{4}"
+    num, lett = ref["numero"], ref["lettera"]
+    if lett is None:
+        num_rx = f"{num}(-[A-Z])?_"
+    elif lett == "E":
+        num_rx = f"{num}(-E)?_"
+    else:
+        num_rx = f"{num}-{lett}_"
+    return f"(^|/){year}-[0-9]{{2}}-[0-9]{{2}}_{ref['tipo']}_{num_rx}"
+
+
+def _reference_hits(docsearch: Any, source_id: str, refs: List[Dict[str, Optional[str]]]) -> List[tuple]:
+    """First passage of each document of the source matching a reference, as ``(text, metadata)``."""
+    if not refs or not hasattr(docsearch, "_get_connection") or not getattr(docsearch, "_table_name", None):
+        return []
+    table = docsearch._table_name
+    text_col = getattr(docsearch, "_text_column", "text")
+    meta_col = getattr(docsearch, "_metadata_column", "metadata")
+    path = f"({meta_col}->>'source')"
+    sql = (
+        f"SELECT {text_col}, {meta_col} FROM ("
+        f"SELECT DISTINCT ON ({path}) id, {text_col}, {meta_col} FROM {table} "
+        f"WHERE source_id = %s AND {path} ~ %s ORDER BY {path}, id"
+        f") d ORDER BY {path} DESC LIMIT %s"
+    )
+    conn = docsearch._get_connection()
+    cursor = conn.cursor()
+    hits: List[tuple] = []
+    try:
+        cursor.execute(f"SET LOCAL statement_timeout = {int(_KEYWORD_TIMEOUT_MS)}")
+        for ref in refs:
+            cursor.execute(sql, (source_id, _reference_path_regex(ref), _REF_MAX_DOCS))
+            hits += [(t, m or {}) for t, m in cursor.fetchall()]
+        conn.commit()
+    except Exception as e:
+        logger.warning(f"Reference lookup failed on {source_id}: {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        hits = []
+    finally:
+        cursor.close()
+    return hits
+
+
 def _search_one_hybrid(
     source_id: str,
     docsearch: Any,
@@ -588,8 +696,9 @@ def _search_one_hybrid(
     keywords: str,
     k: int,
     query_vector: Optional[List[float]],
+    refs: Optional[List[Dict[str, Optional[str]]]] = None,
 ) -> Optional[tuple]:
-    """``(vector_pairs, keyword_hits)`` for one source, or None on failure."""
+    """``(vector_pairs, keyword_hits, reference_hits)`` for one source, or None on failure."""
     try:
         if docsearch is None:
             docsearch = VectorCreator.create_vectorstore(
@@ -603,7 +712,7 @@ def _search_one_hybrid(
         else:
             vector = [(doc, None) for doc in docsearch.search(query, **kwargs)]
         keyword = _keyword_hits(docsearch, source_id, keywords, k) if keywords else []
-        return vector, keyword
+        return vector, keyword, _reference_hits(docsearch, source_id, refs or [])
     except Exception as e:
         logger.error(f"Error searching vectorstore {source_id}: {e}", exc_info=True)
         return None
@@ -638,7 +747,9 @@ def search_documents(
     (path inside the DocsGPT source), ``similarity`` (best cosine similarity
     among its passages, when found semantically), ``passages``: the most
     relevant excerpts, each with ``found_by`` (semantica / parole chiave /
-    entrambe) and ``similarity``. Results are ordered by fused rank.
+    entrambe / riferimento) and ``similarity``. Results are ordered by fused
+    rank, after the acts the question cites by type, number and year
+    (``found_by`` "riferimento", see ``_parse_references``).
     """
     max_documents = max(1, min(int(max_documents or 10), MAX_DOCUMENTS))
     keywords = (keywords or query or "").strip()
@@ -647,6 +758,7 @@ def search_documents(
     if not source_ids:
         return []
     source_names = {s["id"]: s["nome"] for s in selected}
+    refs = _parse_references(f"{query} {keywords}")
 
     fetched = fetch_per_source(
         source_ids,
@@ -654,7 +766,7 @@ def search_documents(
             settings.VECTOR_STORE, sid, settings.EMBEDDINGS_KEY
         ),
         lambda sid, docsearch, qv: _search_one_hybrid(
-            sid, docsearch, query, keywords, _CHUNKS_PER_SOURCE, qv
+            sid, docsearch, query, keywords, _CHUNKS_PER_SOURCE, qv, refs
         ),
         lambda _sid: query,
     )
@@ -663,6 +775,7 @@ def search_documents(
     chunks: Dict[tuple, Dict[str, Any]] = {}
     vector_list: List[tuple] = []   # (similarity, chunk key)
     keyword_list: List[tuple] = []  # (source order, rank in source, relaxed, chunk key)
+    reference_list: List[tuple] = []  # chunk keys of the cited acts, in order
 
     def _register(sid: str, text: str, metadata: Dict[str, Any]) -> tuple:
         doc_sid = metadata.get("source_id") or sid
@@ -676,7 +789,13 @@ def search_documents(
     for s_idx, (sid, result) in enumerate(zip(source_ids, fetched)):
         if not result:
             continue
-        vector, keyword = result
+        vector, keyword, reference = result
+        for text, metadata in reference:
+            if not text:
+                continue
+            key = _register(sid, text, metadata)
+            chunks[key]["by"].add("riferimento")
+            reference_list.append(key)
         for doc, score in vector:
             text, metadata = _doc_fields(doc)
             if not text:
@@ -702,6 +821,9 @@ def search_documents(
     keyword_list.sort(key=lambda v: (v[0], v[1]))
     for rank, (_r, _s, key) in enumerate(keyword_list):
         fused[key] = fused.get(key, 0.0) + 1.0 / (_RRF_K + rank)
+    # The acts the question names come first, ahead of any fused score (< 2/_RRF_K).
+    for rank, key in enumerate(reference_list):
+        fused[key] = fused.get(key, 0.0) + 1.0 - rank / 1000.0
 
     docs: Dict[tuple, Dict[str, Any]] = {}
     order: List[tuple] = []
@@ -716,7 +838,8 @@ def search_documents(
         by = c["by"]
         passage = {
             "text": c["text"],
-            "found_by": "entrambe" if len(by) > 1 else next(iter(by)),
+            "found_by": ("riferimento" if "riferimento" in by
+                         else "entrambe" if len(by) > 1 else next(iter(by))),
             "similarity": c["similarity"],
         }
         doc_key = (c["sid"], c["source"])
