@@ -1,0 +1,20 @@
+# Catalogo delle fonti fiscali (scaricate da downloader.py, caricate da
+# carica_docsgpt.py con i nomi di SOURCE_NAMES). Serve solo all'elenco delle
+# fonti del server MCP (list_sources e filtro "sources" di search_docs): nome
+# della sorgente su DocsGPT, gruppo e descrizione. Il gruppo vale per tutte.
+
+gruppo: "Fisco"
+
+sorgenti:
+  - nome: "Agenzia Entrate"
+    descrizione: "Prassi dell'Agenzia delle Entrate: circolari, risoluzioni, risposte a interpello, lettere circolari, comunicati stampa e novità dal sito dell'Agenzia."
+  - nome: "Ministero Finanze"
+    descrizione: "Prassi del Ministero dell'Economia e delle Finanze (archivio CeDEF): circolari, risoluzioni, note, direttive, delibere, telegrammi e comunicati stampa."
+  - nome: "Agenzia Dogane e Monopoli"
+    descrizione: "Prassi dell'Agenzia delle Dogane e dei Monopoli: circolari, lettere circolari, note e risoluzioni (accise, dogane, giochi, tabacchi)."
+  - nome: "Normativa"
+    descrizione: "Normativa di interesse tributario dall'archivio CeDEF: leggi, decreti legislativi e ministeriali, regolamenti, codici, accordi internazionali e atti UE."
+  - nome: "Giurisprudenza"
+    descrizione: "Giurisprudenza tributaria dall'archivio CeDEF: sentenze, ordinanze e decisioni di Cassazione, Corte costituzionale e giudici tributari di merito."
+  - nome: "Novità fiscali"
+    descrizione: "Documenti fiscali pubblicati nel mese in corso e non ancora confluiti nelle fonti principali: le novità più recenti."

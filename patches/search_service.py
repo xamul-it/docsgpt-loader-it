@@ -5,7 +5,9 @@ also carries ``url``, the public link to the original document, built from
 DOC_LINKS_FILE like the web UI's source links (retriever/labels.py patch).
 Upstream drops the source id before returning, so a client (e.g. Claude via
 MCP) could not rebuild the link from ``source`` alone. Everything else is
-upstream's file as of image arc53/docsgpt 2026-11-02 (copy in
+upstream's file as of image arc53/docsgpt 2026-11-02, plus (below
+``search``) ``search_documents`` and the source catalog (``list_sources``,
+selection by name or group) used by the MCP tools (copy in
 search_service.py.upstream); after an image upgrade, diff against the new one.
 
 Flask-free. Raises domain exceptions (``InvalidAPIKey``, ``SearchFailed``)
@@ -15,8 +17,12 @@ MCP error responses, etc.).
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 from typing import Any, Dict, List, Optional
+
+from sqlalchemy import text as _sql
 
 from docsgpt.core.settings import settings
 from docsgpt.retriever.fanout import fetch_per_source
@@ -35,6 +41,10 @@ class InvalidAPIKey(Exception):
 
 class SearchFailed(Exception):
     """Unexpected error during retrieval (e.g. DB outage). Caller maps to 5xx."""
+
+
+class UnknownSource(ValueError):
+    """A requested source/group matches none of the agent's sources."""
 
 
 def _collect_source_ids(agent: Dict[str, Any]) -> List[str]:
@@ -314,17 +324,107 @@ _TS_CONFIG = "italian"
 _EXCLUSION_RE = _re.compile(r"(^|\s)-\S")
 
 
-def _agent_source_ids(api_key: str) -> List[str]:
+# Source catalog, from the source lists kept in the repository (loader/fonti,
+# mounted read-only): every ``sorgenti`` entry of every *.yaml there that has a
+# ``nome`` gives that source its ``gruppo`` (the entry's, else the file's
+# top-level one) and ``descrizione``. Read on every call: the files are small
+# and edits apply without a restart.
+_CATALOG_DIR = os.environ.get("CATALOGO_FONTI", "/app/fonti")
+
+
+def _catalog() -> Dict[str, Dict[str, Any]]:
+    import glob
+
+    import yaml
+
+    catalog: Dict[str, Dict[str, Any]] = {}
+    for path in sorted(glob.glob(os.path.join(_CATALOG_DIR, "*.yaml"))):
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+            file_group = data.get("gruppo")
+            for entry in data.get("sorgenti") or []:
+                if isinstance(entry, dict) and entry.get("nome"):
+                    catalog[str(entry["nome"])] = {
+                        "gruppo": entry.get("gruppo") or file_group,
+                        "descrizione": entry.get("descrizione"),
+                    }
+        except Exception as e:
+            logger.warning(f"Source catalog {path} unreadable: {e}")
+    return catalog
+
+
+def _agent_sources(api_key: str) -> List[Dict[str, Any]]:
+    """The agent's authorized sources, in agent order, with name and group.
+
+    Each item: ``id``, ``nome``, ``gruppo``, ``descrizione``, ``aggiornata``
+    (date of the last load, AAAA-MM-GG). Group and description come from the
+    catalog; a source missing from it falls back to the "<gruppo> - <nome>"
+    naming convention, then to its own name.
+    """
     try:
         with db_readonly() as conn:
             agent = AgentsRepository(conn).find_by_key(api_key)
             if not agent:
                 raise InvalidAPIKey()
-            return _authorized_source_ids(conn, agent, _collect_source_ids(agent))
+            ids = [s for s in _authorized_source_ids(conn, agent, _collect_source_ids(agent))
+                   if s and s.strip()]
+            rows = conn.execute(
+                _sql("SELECT id::text AS id, name, date FROM sources WHERE id = ANY(CAST(:ids AS uuid[]))"),
+                {"ids": ids},
+            ).mappings().all() if ids else []
     except InvalidAPIKey:
         raise
     except Exception as e:
         raise SearchFailed("agent lookup failed") from e
+    by_id = {r["id"]: r for r in rows}
+    catalog = _catalog()
+    out = []
+    for sid in ids:
+        row = by_id.get(sid)
+        name = row["name"] if row else sid
+        entry = catalog.get(name) or {}
+        group = entry.get("gruppo") or (name.split(" - ", 1)[0] if " - " in name else name)
+        out.append({
+            "id": sid,
+            "nome": name,
+            "gruppo": group,
+            "descrizione": entry.get("descrizione"),
+            "aggiornata": row["date"].date().isoformat() if row and row["date"] else None,
+        })
+    return out
+
+
+def list_sources(api_key: str) -> List[Dict[str, Any]]:
+    """The sources the caller can search, sorted by group and name."""
+    sources = _agent_sources(api_key)
+    return sorted(({k: v for k, v in s.items() if k != "id"} for s in sources),
+                  key=lambda s: (s["gruppo"].casefold(), s["nome"].casefold()))
+
+
+def _select_sources(sources: List[Dict[str, Any]], wanted: Optional[List[str]]) -> List[Dict[str, Any]]:
+    """Sources whose name or group matches one of ``wanted`` (case-insensitive).
+
+    ``None`` or empty selects everything. A name matching nothing raises
+    ``UnknownSource`` listing what is available, so the caller can retry
+    instead of reading an empty result as "nothing found".
+    """
+    wanted = [w.strip() for w in (wanted or []) if w and w.strip()]
+    if not wanted:
+        return sources
+    selected, unknown = [], []
+    for w in wanted:
+        key = w.casefold()
+        hits = [s for s in sources if key in (s["nome"].casefold(), s["gruppo"].casefold())]
+        if not hits:
+            unknown.append(w)
+        selected += [s for s in hits if s not in selected]
+    if unknown:
+        names = "; ".join(f'{s["nome"]} (gruppo {s["gruppo"]})' for s in sources)
+        raise UnknownSource(
+            f"Fonte sconosciuta: {', '.join(unknown)}. Fonti disponibili: {names}"
+        )
+    return selected
 
 
 _TSV_COLUMN = "tsv_it"
@@ -447,15 +547,22 @@ def _doc_fields(doc: Any) -> tuple:
 
 
 def search_documents(
-    api_key: str, query: str, max_documents: int = 10, keywords: Optional[str] = None
+    api_key: str,
+    query: str,
+    max_documents: int = 10,
+    keywords: Optional[str] = None,
+    sources: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     """Hybrid search over the agent's sources, returning distinct documents.
 
     ``keywords`` drives the full-text half (websearch syntax: "exact phrase",
     OR, -exclude); when omitted, ``query`` is used for both halves.
+    ``sources`` restricts the search to the named sources or groups (see
+    ``_select_sources``); omitted, every source of the agent is searched.
 
     Each result: ``title``, ``date`` (from the file name, when present),
-    ``ente`` (archive folder), ``url`` (public link, when known), ``source``
+    ``fonte`` (source name), ``ente`` (archive folder), ``url`` (public link,
+    when known), ``source``
     (path inside the DocsGPT source), ``similarity`` (best cosine similarity
     among its passages, when found semantically), ``passages``: the most
     relevant excerpts, each with ``found_by`` (semantica / parole chiave /
@@ -463,9 +570,11 @@ def search_documents(
     """
     max_documents = max(1, min(int(max_documents or 10), MAX_DOCUMENTS))
     keywords = (keywords or query or "").strip()
-    source_ids = [s for s in _agent_source_ids(api_key) if s and s.strip()]
+    selected = _select_sources(_agent_sources(api_key), sources)
+    source_ids = [s["id"] for s in selected]
     if not source_ids:
         return []
+    source_names = {s["id"]: s["nome"] for s in selected}
 
     fetched = fetch_per_source(
         source_ids,
@@ -553,6 +662,7 @@ def search_documents(
         docs[doc_key] = {
             "title": title,
             "date": date.group(1) if date else None,
+            "fonte": source_names.get(c["sid"]),
             "ente": ente,
             "url": url,
             "source": c["source"],

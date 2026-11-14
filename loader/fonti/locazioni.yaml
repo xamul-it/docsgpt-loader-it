@@ -6,6 +6,9 @@
 # Nota: il testo di Normattiva risulta HTML statico (JS solo per navigazione); per atti lunghi (codice civile) usare "visualizza atto intero"/export.
 # Nota: le date di Normattiva/Regioni nel 2026 sono quelle riportate dalle pagine al momento della verifica.
 
+# Gruppo di tutte le sorgenti del file nell'elenco delle fonti del server MCP.
+gruppo: "Locazioni"
+
 sorgenti:
 
   - id: locazioni-nazionale-affitti-brevi
