@@ -1,6 +1,6 @@
 ---
 name: nuova-fonte
-description: Porta una fonte documentale nuova (sito, banca dati, export XML/JSON, elenco di pagine) dall'URL alla sorgente DocsGPT collegata a Claude. Scrive il loader come adattatore standard, lo testa, misura formati e link, blocca il caricamento se l'estrazione è scadente. Usare per "importa/aggiungi/carica la fonte X da <url>".
+description: Porta una fonte documentale nuova (sito, banca dati, export XML/JSON, elenco di pagine) dall'URL alla sorgente DocsGPT collegata all'archivio consultato dai client MCP. Scrive il loader come adattatore standard, lo testa, misura formati e link, blocca il caricamento se l'estrazione è scadente. Usare per "importa/aggiungi/carica la fonte X da <url>".
 argument-hint: "<richiesta in linguaggio naturale con URL della fonte>"
 ---
 
@@ -91,6 +91,7 @@ Voce in `loader/fonti/pipeline.yaml` (valori di partenza, li cambiano le fasi 3�
   - id: <id>
     gruppo: <gruppo>
     nome: "<nome sorgente>"
+    descrizione: "<una frase sul contenuto>"   # la legge chi sceglie le fonti (list_sources del server MCP)
     adattatore: <nome>
     url: "<url>"
     formato: <primo formato dell'adattatore>
@@ -173,9 +174,10 @@ si rifiuta di caricare senza `qualita.json` tutto OK sull'estrazione attuale.
 
 Un solo messaggio all'utente: link al rapporto e 5 righe (unità e quante,
 formato e perché, link e perché, qualità, benchmark). Domanda: "Collego la
-fonte a Claude?".
+fonte all'agente "Archivio documentale"?" (è quello dei client MCP).
 - **Sì** (`fonte-esecutore`): `python3 prova_fonte.py promuovi --id <id>`
-  (rifiuta se manca un benchmark PASS sull'estrazione attuale); in
+  (rifiuta se manca un benchmark PASS sull'estrazione attuale o la
+  `descrizione` in `pipeline.yaml`); in
   `pipeline.yaml` togli `provvisorio: true`; commit sul branch corrente di
   adattatore, fixture, test, `pipeline.yaml`, domande e rapporto. Da allora il
   notifier la aggiorna da solo (le voci provvisorie le ignora).

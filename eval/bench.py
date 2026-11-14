@@ -4,7 +4,7 @@
 # Uso (dalla radice del repository):
 #   python3 -c "import yaml,json;json.dump(yaml.safe_load(open('eval/domande.yaml')),open('/tmp/d.json','w'))"
 #   KEY=$(docker exec docsgpt-postgres-1 psql -U docsgpt -d docsgpt -Atc \
-#         "select key from agents where name='Claude - archivio fiscale'")
+#         "select key from agents where name='Archivio documentale'")
 #   docker cp eval/bench.py docsgpt-backend-1:/tmp/bench.py
 #   docker exec -i -e AGENT_KEY="$KEY" -e PYTHONPATH=/app -w /app docsgpt-backend-1 \
 #         python /tmp/bench.py < /tmp/d.json > eval/risultati-AAAA-MM-GG.jsonl

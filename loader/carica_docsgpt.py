@@ -10,7 +10,7 @@ Uso:
   python carica_docsgpt.py --target /data/rag                       # tutti gli enti presenti
   python carica_docsgpt.py --target /data/rag --source agenzia-entrate
   python carica_docsgpt.py --target /data/rag --source normativa --replace
-  python carica_docsgpt.py --target /data/rag --source locazioni --agent "Claude - archivio fiscale"
+  python carica_docsgpt.py --target /data/rag --source locazioni --agent "Archivio documentale"
 
 Per ogni ente (cartella di primo livello dell'archivio, oppure locazioni/<id>):
   - impacchetta in uno zip non compresso i soli documenti citati nei manifest

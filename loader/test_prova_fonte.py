@@ -105,6 +105,17 @@ class GateTest(unittest.TestCase):
         p.stato_prova(self.stati, CFG).write_text(json.dumps({"bench": {"ok": True, "manifest": p.impronta(self.d)}}))
         p.richiedi_bench(self.tmp, self.stati, CFG)
 
+    def test_promuovi_senza_descrizione_rifiutata(self):
+        # Qualità e benchmark superati: manca solo la descrizione per list_sources.
+        self.stati.mkdir()
+        (self.d / "qualita.json").write_text(json.dumps({"manifest": p.impronta(self.d), "esiti": [{"nome": "x", "ok": True}]}))
+        p.stato_prova(self.stati, CFG).write_text(json.dumps({"bench": {"ok": True, "manifest": p.impronta(self.d)}}))
+        cfg = {k: v for k, v in CFG.items() if k != "descrizione"}
+        with mock.patch.object(p.carica_docsgpt, "load_ente") as load:
+            with self.assertRaisesRegex(p.FonteError, "descrizione"):
+                p.promuovi("http://api", self.tmp, self.stati, cfg, self.tmp, "http://docs", self.tmp / "links.json")
+            load.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

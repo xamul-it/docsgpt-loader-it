@@ -35,7 +35,8 @@ import fonte
 from fonte import FonteError, impronta
 
 ARCHIVIO = Path("/home/htpc/containers/docsgpt/circolari")
-AGENTE_CLAUDE = "Claude - archivio fiscale"
+# Agente principale: la sua chiave è quella dei client MCP (Claude, GPT, …).
+AGENTE_PRINCIPALE = "Archivio documentale"
 EVAL = Path(__file__).resolve().parents[1] / "eval"
 BACKEND = "docsgpt-backend-1"
 STATI = Path(carica_docsgpt.LINKS_FILE).parents[1] / "prove"   # data/prove: non servito, fuori da git
@@ -192,10 +193,14 @@ def bench(archivio: Path, stati: Path, cfg: dict) -> tuple[bool, float, Path]:
 def promuovi(api: str, archivio: Path, stati: Path, cfg: dict, tmp_dir: Path, docs_url: str, links_file: Path) -> None:
     richiedi_qualita(archivio, cfg)
     richiedi_bench(archivio, stati, cfg)
+    if not str(cfg.get("descrizione") or "").strip():
+        # Senza, list_sources del server MCP la mostra senza dire cosa contiene
+        # e chi sceglie le fonti non sa quando cercarci.
+        raise FonteError(f"{cfg['id']}: manca descrizione in pipeline.yaml (una frase sul contenuto)")
     ente = f"{cfg['gruppo']}/{cfg['id']}"
     # La voce è ancora provvisoria (esclusa da carica_docsgpt): il nome si passa qui.
     carica_docsgpt.SOURCE_NAMES[ente] = cfg["nome"]
-    if not carica_docsgpt.load_ente(api, Path(archivio), ente, Path(tmp_dir), True, docs_url, links_file, AGENTE_CLAUDE):
+    if not carica_docsgpt.load_ente(api, Path(archivio), ente, Path(tmp_dir), True, docs_url, links_file, AGENTE_PRINCIPALE):
         raise FonteError(f"caricamento definitivo di {ente} fallito")
     pulisci(api, stati, cfg, links_file)
 
