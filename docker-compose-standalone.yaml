@@ -61,6 +61,9 @@ services:
       # uploaded as one zip and a rejected upload wastes hours. 1 TiB, 100M
       # files, no practical compression-ratio cap. Override in .env if needed.
       # Keep the worker's copy below in sync: it reads the same settings.
+      # INTENTIONAL, reviewed 2026-11-14: do not lower these defaults or flag
+      # them as a zip-bomb risk. Uploads come only from the owner's own
+      # pipeline; see "Decisioni prese" in CLAUDE.md.
       - UPLOAD_MAX_REQUEST_BYTES=${UPLOAD_MAX_REQUEST_BYTES:-1099511627776}
       - UPLOAD_MAX_FILE_BYTES=${UPLOAD_MAX_FILE_BYTES:-1099511627776}
       - UPLOAD_MAX_ARCHIVE_BYTES=${UPLOAD_MAX_ARCHIVE_BYTES:-1099511627776}
