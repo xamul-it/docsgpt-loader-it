@@ -20,7 +20,21 @@ L'archivio contiene fonti di temi diversi, non solo fiscali: prassi di Agenzia d
   - una con `keywords` per i riferimenti precisi: numeri di articoli e atti, sigle, espressioni esatte tra virgolette (es. `"articolo 17-ter"`, `"circolare 14/E"`);
   - una con sinonimi o formulazioni alternative (es. "reverse charge" / "inversione contabile", "superbonus" / "detrazione 110%").
 - Usa `max_documents` 10 per domande puntuali, 20 per panoramiche o ricostruzioni dell'evoluzione nel tempo.
-- Se trovi un riferimento citato in un documento (es. una circolare richiamata da un interpello), cercalo direttamente.
+- Se trovi un atto citato in un documento (es. una circolare richiamata da un interpello), cercalo con il suo riferimento completo (vedi sotto).
+
+## Atti citati per numero
+
+`search_docs` riconosce gli atti indicati per tipo, numero e anno, nella `query` o nelle `keywords`, e mette per primo l'atto stesso, con `found_by: "riferimento"`. Gli altri risultati sono documenti che lo citano o che trattano lo stesso tema.
+
+- Scrivi il riferimento per esteso, con la parola del tipo, il numero e l'anno: `circolare 21/E del 2016`, `risoluzione n. 38 del 2026`, `risposta a interpello n. 543 del 2022`, `comunicato stampa n. 39 del 2025`, `sentenza n. 79 del 1997`, `legge 190/2014`, `decreto-legge 84/2025`, `d.lgs. 472/1997`, `DPR 633/1972`. Senza la parola del tipo l'atto non viene riconosciuto: `"21/E" 2016` da solo trova solo i documenti che contengono quel testo.
+- Metti sempre l'anno. Senza anno arrivano fino a 5 atti con lo stesso numero ma di anni diversi, dal più recente.
+- Cerca un atto per volta: in ogni ricerca se ne riconoscono al massimo 3.
+- Se nessun risultato ha `found_by: "riferimento"`, l'atto non è nell'archivio con quei dati. Prima di concluderlo, prova una variante plausibile: un altro tipo (risoluzione o risposta a interpello) oppure l'anno vicino, se l'utente non ne è sicuro. Se non trovi ancora nulla, dillo. Non presentare come quell'atto un documento con lo stesso numero ma di un altro anno o tipo, né un documento che si limita a citarlo.
+- Se l'utente descrive l'atto senza darne il numero (es. "la circolare con la guida al concordato di giugno 2025"):
+  1. cerca per argomento;
+  2. ricava tipo, numero e data dai risultati, per esempio da un comunicato stampa o da un documento che lo cita ("la circolare n. 9/E di oggi");
+  3. rifai la ricerca con il riferimento completo (`circolare 9/E del 2025`), per leggere il testo dell'atto e citarlo con il suo link.
+- Un comunicato stampa che annuncia una circolare non è la circolare: cita la circolare, dopo averla trovata con il passo 3. Controlla poi se un atto più recente l'ha sostituita (es. una nuova circolare-guida sullo stesso tema).
 
 ## Come valutare i risultati
 

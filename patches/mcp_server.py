@@ -134,9 +134,12 @@ async def search_docs(
     "entrambe" o "riferimento") e similarity. I risultati sono già ordinati
     per pertinenza complessiva. Se la domanda o le keywords citano un atto
     per tipo, numero e anno ("circolare 21/E del 2016", "d.lgs. 472/1997"),
-    l'atto viene per primo con found_by "riferimento". Se manca, l'atto non
+    l'atto viene per primo con found_by "riferimento". Serve la parola del
+    tipo e conviene l'anno ("21/E" da solo non basta). Se manca, l'atto non
     è nell'archivio: non usare al suo posto un documento con lo stesso
-    numero.
+    numero. Se l'atto è descritto senza numero, ricava numero e anno dai
+    risultati (es. un comunicato che annuncia "la circolare n. 9/E") e
+    rifai la ricerca con il riferimento completo.
     """
     api_key = _require_key()
     try:
