@@ -455,12 +455,86 @@ def _has_tsv_column(docsearch: Any, table: str) -> bool:
     return _tsv_column_cache[table]
 
 
+# Relaxed (OR) query: lexemes found in more than this fraction of the chunks
+# are left out. A natural-language question OR-ed in full ("vendo casa fatto
+# pago anni fa ...") matched 63% of Normativa, and ranking all of it took
+# 3 s alone and past the timeout under concurrent searches (issue #4); the
+# rare terms alone take 0.06-0.2 s, and common terms barely move ts_rank_cd.
+_OR_MAX_FREQ = 0.05
+# ...but at least this many lexemes are kept (the rarest), so a question
+# made only of common words still has a keyword half.
+_OR_MIN_TERMS = 2
+# Lexeme frequencies come from the column statistics (pg_stats, refreshed by
+# ANALYZE): reread after this many seconds.
+_FREQ_TTL_S = 3600
+_freq_cache: Dict[str, tuple] = {}
+_LEXEME_RE = _re.compile(r"'((?:[^']|'')*)'")
+
+
+def _lexeme_freqs(docsearch: Any, table: str) -> Dict[str, float]:
+    """``{lexeme: fraction of rows}`` for the most common lexemes of the tsvector column."""
+    import time
+
+    cached = _freq_cache.get(table)
+    if cached and time.monotonic() - cached[0] < _FREQ_TTL_S:
+        return cached[1]
+    freqs: Dict[str, float] = {}
+    conn = docsearch._get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "SELECT most_common_elems::text::text[], most_common_elem_freqs FROM pg_stats "
+            "WHERE tablename = %s AND attname = %s",
+            (table, _TSV_COLUMN),
+        )
+        row = cursor.fetchone()
+        if row and row[0] and row[1]:
+            # most_common_elem_freqs ends with 3 extra values (min, max, null
+            # frequency): zip stops at the last lexeme.
+            freqs = dict(zip(row[0], row[1]))
+        conn.commit()
+    except Exception as e:
+        logger.warning(f"Lexeme statistics unavailable on {table}: {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+    finally:
+        cursor.close()
+    _freq_cache[table] = (time.monotonic(), freqs)
+    return freqs
+
+
+def _relaxed_tsquery(strict: str, freqs: Dict[str, float]) -> str:
+    """OR form of the strict tsquery text, without the most common lexemes.
+
+    Lexemes above ``_OR_MAX_FREQ`` are dropped, keeping at least the
+    ``_OR_MIN_TERMS`` rarest; lexemes missing from ``freqs`` count as rare.
+    A query with phrases (``<->``) keeps every term and only has its ``&``
+    turned into ``|``, as before: those come from keywords written by the
+    caller, short and chosen on purpose.
+    """
+    if "<" in strict:
+        return strict.replace(" & ", " | ")
+    lexemes: List[str] = []
+    for lex in _LEXEME_RE.findall(strict):
+        if lex not in lexemes:
+            lexemes.append(lex)
+    kept = [lex for lex in lexemes if freqs.get(lex.replace("''", "'"), 0.0) <= _OR_MAX_FREQ]
+    if len(kept) < min(_OR_MIN_TERMS, len(lexemes)):
+        rarest = sorted(lexemes, key=lambda lex: freqs.get(lex.replace("''", "'"), 0.0))
+        rarest = set(rarest[:_OR_MIN_TERMS])
+        kept = [lex for lex in lexemes if lex in rarest]
+    return " | ".join(f"'{lex}'" for lex in kept)
+
+
 def _keyword_hits(docsearch: Any, source_id: str, text: str, k: int) -> List[tuple]:
     """Italian full-text hits of one pgvector source as ``(text, metadata, relaxed)``.
 
     Strict query first (all terms, phrases, exclusions as written); when it
-    finds nothing, the same terms joined by OR, flagged ``relaxed`` (skipped
-    when the text has exclusions: OR-ing "-term" would match almost anything).
+    finds nothing, the terms joined by OR without the most common ones (see
+    ``_relaxed_tsquery``), flagged ``relaxed`` (skipped when the text has
+    exclusions: OR-ing "-term" would match almost anything).
     Non-pgvector stores return ``[]``.
     """
     if not hasattr(docsearch, "_get_connection") or not getattr(docsearch, "_table_name", None):
@@ -468,30 +542,28 @@ def _keyword_hits(docsearch: Any, source_id: str, text: str, k: int) -> List[tup
     table = docsearch._table_name
     text_col = getattr(docsearch, "_text_column", "text")
     meta_col = getattr(docsearch, "_metadata_column", "metadata")
-    tsv = (
-        _TSV_COLUMN
-        if _has_tsv_column(docsearch, table)
-        else f"to_tsvector('{_TS_CONFIG}'::regconfig, {text_col})"
-    )
+    has_tsv = _has_tsv_column(docsearch, table)
+    tsv = _TSV_COLUMN if has_tsv else f"to_tsvector('{_TS_CONFIG}'::regconfig, {text_col})"
+    freqs = _lexeme_freqs(docsearch, table) if has_tsv else {}
     sql = (
-        f"SELECT {text_col}, {meta_col} FROM {table}, ({{q}}) AS q(query) "
+        f"SELECT {text_col}, {meta_col} FROM {table}, (SELECT %s::tsquery) AS q(query) "
         f"WHERE source_id = %s AND numnode(q.query) > 0 AND {tsv} @@ q.query "
         f"ORDER BY ts_rank_cd({tsv}, q.query) DESC LIMIT %s"
-    )
-    strict = f"SELECT websearch_to_tsquery('{_TS_CONFIG}'::regconfig, %s)"
-    relaxed = (
-        f"SELECT replace(websearch_to_tsquery('{_TS_CONFIG}'::regconfig, %s)::text, ' & ', ' | ')::tsquery"
     )
     conn = docsearch._get_connection()
     cursor = conn.cursor()
     hits: List[tuple] = []
     try:
         cursor.execute(f"SET LOCAL statement_timeout = {int(_KEYWORD_TIMEOUT_MS)}")
+        cursor.execute(f"SELECT websearch_to_tsquery('{_TS_CONFIG}'::regconfig, %s)::text", (text,))
+        strict = cursor.fetchone()[0] or ""
         attempts = [(strict, False)]
         if not _EXCLUSION_RE.search(text):
-            attempts.append((relaxed, True))
-        for query_sql, is_relaxed in attempts:
-            cursor.execute(sql.format(q=query_sql), (text, source_id, k))
+            relaxed = _relaxed_tsquery(strict, freqs)
+            if relaxed and relaxed != strict:
+                attempts.append((relaxed, True))
+        for query_text, is_relaxed in attempts:
+            cursor.execute(sql, (query_text, source_id, k))
             rows = cursor.fetchall()
             hits = [(t, m or {}, is_relaxed) for t, m in rows]
             if hits:
