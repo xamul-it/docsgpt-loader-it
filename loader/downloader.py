@@ -1406,7 +1406,7 @@ def _parse_prassi_multiparte(http: Http, source_name: str, detail_url: str, html
         title=title,
         document_date=guess_date(estremi),
         authority=_authority_from_estremi(estremi),
-        document_type=_doctype_from_estremi(estremi, "Prassi"),
+        document_type=_doctype_from_estremi(estremi, ""),
         number=number_from_estremi(estremi),
         detail_url=detail_url,
         download_url=detail_url,
@@ -1461,7 +1461,7 @@ def _parse_prassi_detail(http: Http, source_name: str, detail_url: str, html: st
         title=title,
         document_date=guess_date(estremi),
         authority=_authority_from_estremi(estremi),
-        document_type=_doctype_from_estremi(estremi, "Prassi"),
+        document_type=_doctype_from_estremi(estremi, ""),
         number=number_from_estremi(estremi),
         detail_url=detail_url,
         download_url=detail_url,
@@ -1616,10 +1616,17 @@ def matches_authority(doc: Doc, cfg: dict) -> bool:
 
 
 def matches_document_type(doc: Doc, cfg: dict) -> bool:
+    """Il tipo dichiarato da CeRDEF deve coincidere con quello della source.
+
+    Il titolo si guarda solo se il tipo manca: i comunicati stampa titolati
+    "In una circolare..." finivano tra le circolari (issue #1).
+    """
     wanted = cfg.get("document_type")
     if not wanted:
         return True
-    return wanted.lower() in (doc.title + " " + doc.document_type).lower()
+    if norm_text(doc.document_type):
+        return norm_text(doc.document_type).lower() == wanted.lower()
+    return wanted.lower() in doc.title.lower()
 
 
 def walk_cedef_results(

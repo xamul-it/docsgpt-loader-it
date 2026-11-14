@@ -17,6 +17,35 @@ from unittest import mock
 import downloader as d
 
 
+class MatchesDocumentTypeTest(unittest.TestCase):
+    CFG = {"document_type": "Circolare"}
+
+    def doc(self, title, tipo):
+        return d.Doc(source="agenzia-entrate/circolari", title=title, document_type=tipo)
+
+    def test_comunicato_che_cita_una_circolare_e_scartato(self):
+        # Comunicato stampa n. 39 del 24/6/2025 (issue #1).
+        doc = self.doc("Pronta la guida operativa sul concordato preventivo biennale. "
+                       "In una circolare tutte le indicazioni", "Comunicato Stampa")
+        self.assertFalse(d.matches_document_type(doc, self.CFG))
+
+    def test_lettera_circolare_non_e_una_circolare(self):
+        self.assertFalse(d.matches_document_type(self.doc("Oggetto", "Lettera circolare"), self.CFG))
+
+    def test_circolare_accettata_anche_se_il_titolo_non_lo_dice(self):
+        self.assertTrue(d.matches_document_type(self.doc("Concordato preventivo biennale", "Circolare"), self.CFG))
+
+    def test_tipo_confrontato_senza_maiuscole_e_spazi(self):
+        self.assertTrue(d.matches_document_type(self.doc("x", " circolare "), self.CFG))
+
+    def test_senza_tipo_si_guarda_il_titolo(self):
+        self.assertTrue(d.matches_document_type(self.doc("Circolare n. 9/E", ""), self.CFG))
+        self.assertFalse(d.matches_document_type(self.doc("Risoluzione n. 3/E", ""), self.CFG))
+
+    def test_source_senza_tipo_accetta_tutto(self):
+        self.assertTrue(d.matches_document_type(self.doc("x", "Comunicato Stampa"), {}))
+
+
 class HostLimiterTest(unittest.TestCase):
     def test_piu_thread_non_superano_il_ritmo(self):
         lim = d.HostLimiter(50)

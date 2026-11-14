@@ -92,13 +92,24 @@ def check_local(root: Path, rows: list[dict]) -> tuple[list[str], list[str]]:
     return broken, orphans
 
 
+def wrong_type(rows: list[dict], cfg: dict) -> list[str]:
+    """Righe il cui tipo non è quello della source (es. comunicati tra le circolari, issue #1)."""
+    if not cfg.get("document_type"):
+        return []
+    return [
+        f"{row.get('local_file') or row.get('detail_url')} ({row.get('document_type')})"
+        for row in rows
+        if not d.matches_document_type(d.Doc(source="", title=row.get("title", ""), document_type=row.get("document_type", "")), cfg)
+    ]
+
+
 def accepted(cfg: dict, estremi: str, titolo: str) -> bool:
     """Stessi filtri del downloader, applicati agli estremi dell'elenco."""
     doc = d.Doc(
         source="",
         title=titolo,
         authority=d._authority_from_estremi(estremi),
-        document_type=d._doctype_from_estremi(estremi, "Prassi"),
+        document_type=d._doctype_from_estremi(estremi, ""),
     )
     return d.matches_document_type(doc, cfg) and d.matches_authority(doc, cfg)
 
@@ -209,13 +220,17 @@ def check_source(target: Path, source: str, cfg: dict, verbose: bool) -> bool:
         rows += sub_rows
         broken += [prefix + x for x in sub_broken]
         orphans += [prefix + x for x in sub_orphans]
-    print(f"  manifest: {len(rows)} documenti | senza file: {len(broken)} | file non in manifest: {len(orphans)}")
-    for label, lst in (("senza file", broken), ("non in manifest", orphans)):
+    mistyped = wrong_type(rows, cfg)
+    print(
+        f"  manifest: {len(rows)} documenti | senza file: {len(broken)} | "
+        f"file non in manifest: {len(orphans)} | tipo diverso dalla source: {len(mistyped)}"
+    )
+    for label, lst in (("senza file", broken), ("non in manifest", orphans), ("tipo diverso", mistyped)):
         for item in lst if verbose else lst[:5]:
             print(f"    {label}: {item}")
         if not verbose and len(lst) > 5:
             print(f"    ... altri {len(lst) - 5} (usa -v)")
-    ok = not broken and not orphans
+    ok = not broken and not orphans and not mistyped
 
     if cfg["kind"] in CEDEF_CHANNEL:
         ok = check_cedef(root, source, cfg, rows, verbose) and ok
