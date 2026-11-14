@@ -7,7 +7,5 @@ nohup.out
 __pycache__/
 *.pyc
 
-# Configurazione con segreti (password predefinite, chiavi): va pubblicata
-# solo come esempio ripulito
+# Segreti (password, chiavi): il compose li legge da qui
 .env
-docker-compose-standalone.yaml
