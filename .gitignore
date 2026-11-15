@@ -9,3 +9,6 @@ __pycache__/
 
 # Segreti (password, chiavi): il compose li legge da qui
 .env
+
+# Istruzioni di collegamento MCP con la chiave in chiaro
+claude/collegamento-mcp.md
