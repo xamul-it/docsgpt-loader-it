@@ -166,9 +166,9 @@ domande:
 - id: loc-03
   categoria: locazioni-curate
   domanda: "In Emilia-Romagna il CIR regionale è ancora necessario ora che c'è il CIN nazionale?"
-  attesi: [locazioni/regione-emilia-romagna/files/circolare-in-materia-di-cin-e-cir-prot-951915.html]
-  fatti: ["(da verificare dopo un nuovo download)"]
-  trappola: "La pagina salvata ha circa 1.500 caratteri, quasi senza testo: è un errore di download. Se Claude 'risponde' citandola, sta inventando."
+  attesi: [locazioni/regione-emilia-romagna/files/circolare-in-materia-di-cin-e-cir-prot-951915.pdf]
+  fatti: ["circolare della Regione Emilia-Romagna prot. 0951915 del 5/9/2024", "dal 2 novembre 2024 il CIN sostituisce il CIR negli annunci e nella promozione", "resta obbligatoria l'iscrizione a Ross 1000: il CIR diventa codice di interscambio tra banca dati regionale e BDSR", "si applicano solo le sanzioni nazionali dell'art. 13-ter del DL 145/2023"]
+  trappola: "Rispondere che il CIR non serve più del tutto (l'iscrizione a Ross 1000 resta il presupposto per il CIN), o che vanno indicati entrambi i codici negli annunci."
 
 # --- Filtri (oggi non esprimibili in search_docs) ---------------------------
 - id: fil-01
