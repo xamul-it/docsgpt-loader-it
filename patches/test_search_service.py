@@ -150,5 +150,29 @@ class Peso(unittest.TestCase):
         self.assertEqual(s._weight(0.5, "f"), 0.5)
 
 
+class Catalogo(unittest.TestCase):
+    """Gruppo mostrato da list_sources: gruppo_catalogo, poi gruppo della voce, poi del file."""
+
+    def catalogo(self, testo):
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "f.yaml"), "w", encoding="utf-8") as f:
+                f.write(testo)
+            vecchia, s._CATALOG_DIR = s._CATALOG_DIR, d
+            try:
+                return s._catalog()
+            finally:
+                s._CATALOG_DIR = vecchia
+
+    def test_gruppo_catalogo_prevale_sul_gruppo_tecnico(self):
+        c = self.catalogo('sorgenti:\n  - nome: "A"\n    gruppo: codici\n    gruppo_catalogo: Codici\n')
+        self.assertEqual(c["A"]["gruppo"], "Codici")
+
+    def test_senza_gruppo_catalogo_vale_il_gruppo(self):
+        c = self.catalogo('gruppo: Fisco\nsorgenti:\n  - nome: "A"\n    gruppo: codici\n  - nome: "B"\n')
+        self.assertEqual((c["A"]["gruppo"], c["B"]["gruppo"]), ("codici", "Fisco"))
+
+
 if __name__ == "__main__":
     unittest.main()

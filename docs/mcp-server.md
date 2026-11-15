@@ -25,7 +25,7 @@ La chiave non va mai nel repository. Per leggerla:
 
 Elenca le fonti consultabili con la chiave. Ogni voce ha:
 - `nome`: da usare in `sources`;
-- `gruppo`: per esempio `Fisco`, `Locazioni`, `codici`;
+- `gruppo`: per esempio `Fisco`, `Locazioni`, `Codici`;
 - `descrizione`: che cosa contiene la fonte;
 - `aggiornata`: data dell'ultimo caricamento (AAAA-MM-GG).
 
@@ -61,13 +61,16 @@ con `text`, `found_by`, `similarity`).
 `nome`, `gruppo` e `descrizione` vengono dai file `loader/fonti/*.yaml`,
 montati in sola lettura in `/app/fonti` (variabile `CATALOGO_FONTI` per
 cambiare cartella). Si legge ogni voce di `sorgenti` che ha un `nome`.
-`gruppo` è quello della voce oppure, se manca, quello in testa al file.
+`gruppo` è il `gruppo_catalogo` della voce, altrimenti il suo `gruppo`,
+altrimenti quello in testa al file. In `pipeline.yaml` il `gruppo` è anche la
+cartella dell'archivio e la chiave dei caricamenti (minuscolo, es. `codici`):
+il nome mostrato va in `gruppo_catalogo` (es. `Codici`).
 
 | File | Fonti | Gruppo |
 |---|---|---|
 | `fisco.yaml` | prassi, normativa, giurisprudenza, novità (`downloader.py`) | `Fisco`, in testa al file |
 | `locazioni.yaml` | elenco curato delle locazioni | `Locazioni`, in testa al file |
-| `pipeline.yaml` | fonti della pipeline `/nuova-fonte` | `gruppo` della voce |
+| `pipeline.yaml` | fonti della pipeline `/nuova-fonte` | `gruppo_catalogo` della voce (se manca, `gruppo`) |
 
 I file si leggono a ogni chiamata, quindi le modifiche valgono senza
 riavviare. Una sorgente che manca dal catalogo compare comunque: il gruppo si

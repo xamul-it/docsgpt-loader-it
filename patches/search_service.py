@@ -326,8 +326,9 @@ _EXCLUSION_RE = _re.compile(r"(^|\s)-\S")
 
 # Source catalog, from the source lists kept in the repository (loader/fonti,
 # mounted read-only): every ``sorgenti`` entry of every *.yaml there that has a
-# ``nome`` gives that source its ``gruppo`` (the entry's, else the file's
-# top-level one), ``descrizione`` and ``peso`` (weight of its hits in the fused
+# ``nome`` gives that source its ``gruppo`` (the entry's ``gruppo_catalogo``,
+# else its ``gruppo``, else the file's top-level one; in pipeline.yaml
+# ``gruppo`` is also a folder name, so the shown one goes in ``gruppo_catalogo``), ``descrizione`` and ``peso`` (weight of its hits in the fused
 # ranking, default 1). Read on every call: the files are small and edits apply
 # without a restart.
 _CATALOG_DIR = os.environ.get("CATALOGO_FONTI", "/app/fonti")
@@ -361,7 +362,7 @@ def _catalog() -> Dict[str, Dict[str, Any]]:
             for entry in data.get("sorgenti") or []:
                 if isinstance(entry, dict) and entry.get("nome"):
                     catalog[str(entry["nome"])] = {
-                        "gruppo": entry.get("gruppo") or file_group,
+                        "gruppo": entry.get("gruppo_catalogo") or entry.get("gruppo") or file_group,
                         "descrizione": entry.get("descrizione"),
                         "peso": _weight(entry.get("peso"), path),
                     }

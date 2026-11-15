@@ -3,6 +3,7 @@
 #
 #   - id: codice-civile              # cartella <archivio>/<gruppo>/<id>, prefisso delle domande in eval/
 #     gruppo: codici                 # --source di carica_docsgpt.py e ente del notifier (non un nome di downloader.py)
+#     gruppo_catalogo: Codici        # facoltativo: gruppo mostrato da list_sources e usabile in "sources" (default: gruppo)
 #     nome: "Codice civile"          # nome della sorgente su DocsGPT
 #     descrizione: "…"               # una frase sul contenuto: la legge chi sceglie le fonti (list_sources del server MCP)
 #     adattatore: normattiva         # adattatori/<nome>.py
@@ -18,6 +19,7 @@
 sorgenti:
   - id: codice-civile
     gruppo: codici
+    gruppo_catalogo: Codici
     nome: "Codice civile"
     descrizione: "Testo vigente del Codice civile (R.D. 262/1942) da Normattiva, un documento per articolo: persone e famiglia, successioni, proprietà, obbligazioni e contratti, lavoro, impresa e società."
     adattatore: normattiva

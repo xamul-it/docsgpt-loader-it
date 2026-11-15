@@ -90,6 +90,7 @@ Voce in `loader/fonti/pipeline.yaml` (valori di partenza, li cambiano le fasi 3â
 ```yaml
   - id: <id>
     gruppo: <gruppo>
+    gruppo_catalogo: <Gruppo>                 # facoltativo: gruppo mostrato da list_sources (default: gruppo)
     nome: "<nome sorgente>"
     descrizione: "<una frase sul contenuto>"   # la legge chi sceglie le fonti (list_sources del server MCP)
     adattatore: <nome>
