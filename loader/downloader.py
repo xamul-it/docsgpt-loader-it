@@ -64,6 +64,8 @@ import xml.etree.ElementTree as ET
 import requests
 from bs4 import BeautifulSoup
 
+import misura_testo_utile
+
 UA = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36 "
@@ -260,6 +262,9 @@ SOURCES = {
 CURATED_YAML = Path(__file__).resolve().parent / "fonti" / "locazioni.yaml"
 # Sotto questa soglia di caratteri una pagina html non e un documento.
 CURATED_MIN_TEXT = 200
+# Campi facoltativi di una voce (issue #3): solo_link: "si" = la pagina resta nell'elenco
+# ma non si scarica (login, indici); documento: <url> = si scarica il file collegato
+# (PDF, testo integrale) al posto della scheda in url, che resta la chiave della voce.
 CURATED_REQUIRED = ("titolo", "ente", "tipo", "url", "verificato")
 
 
@@ -269,6 +274,17 @@ def curated_slug(title: str, max_len: int = 120) -> str:
     s = "".join(c for c in s if not unicodedata.combining(c))
     s = re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
     return s[:max_len].strip("-") or "documento"
+
+
+def curated_solo_link(voce: dict) -> bool:
+    return str(voce.get("solo_link", "")).strip().lower() == "si"
+
+
+def curated_sospetto(path: Path) -> bool:
+    """True se il file già scaricato è una pagina html sospetta (vedi misura_testo_utile)."""
+    if path.suffix != ".html":
+        return False
+    return bool(misura_testo_utile.sospetti(misura_testo_utile.misura(path.read_bytes())))
 
 
 def curated_sources(path: Path = CURATED_YAML) -> dict[str, dict]:
@@ -284,6 +300,8 @@ def curated_sources(path: Path = CURATED_YAML) -> dict[str, dict]:
             missing = [k for k in CURATED_REQUIRED if not voce.get(k)]
             if missing:
                 raise ValueError(f"{path.name}, {src.get('id')}: voce {voce.get('titolo')!r} senza {', '.join(missing)}")
+            if curated_solo_link(voce) and voce.get("documento"):
+                raise ValueError(f"{path.name}, {src.get('id')}: voce {voce['titolo']!r} con solo_link e documento insieme")
             slug = curated_slug(voce["titolo"])
             if slug in slugs:
                 raise ValueError(f"{path.name}, {src.get('id')}: due voci con lo stesso slug {slug!r}")
@@ -1920,31 +1938,62 @@ def curated_source(http: Http, store: Store, source_name: str, cfg: dict, mode: 
     sha cambia il file è sovrascritto, il manifest aggiornato e la cosa
     annotata in errors.log come "aggiornato". Le voci non verificate sono
     saltate e annotate allo stesso modo.
-    """
-    stats = {"downloaded": 0, "updated": 0, "unchanged": 0, "skipped_unverified": 0, "errors": 0}
-    voci = []
-    for voce in cfg["voci"]:
-        if str(voce.get("verificato", "")).strip().lower() == "si":
-            voci.append(voce)
-        else:
-            stats["skipped_unverified"] += 1
-            store.error(f"{voce['titolo']} <{voce['url']}>: non verificata, saltata")
 
-    def fetch(voce: dict) -> str:
+    Le voci "solo_link" non si scaricano; per loro e per le non verificate al
+    refresh si tolgono file e riga già presenti; con "documento" si scarica quell'URL al posto di url. Le
+    pagine html con poco testo utile, un campo password o a frame si scaricano
+    ma sono segnalate in errors.log come "pagina sospetta"; al refresh una
+    versione sospetta non sostituisce una precedente che non lo era.
+    """
+    stats = {"downloaded": 0, "updated": 0, "unchanged": 0, "skipped_unverified": 0, "solo_link": 0,
+             "sospette": 0, "tenute_precedenti": 0, "errors": 0}
+    voci = []
+    def togli_gia_scaricata(voce: dict) -> None:
+        old = store.existing.pop(voce["url"], None)
+        if old and old.get("local_file"):
+            (store.root / old["local_file"]).unlink(missing_ok=True)
+
+    for voce in cfg["voci"]:
+        if str(voce.get("verificato", "")).strip().lower() != "si":
+            stats["skipped_unverified"] += 1
+            togli_gia_scaricata(voce)
+            store.error(f"{voce['titolo']} <{voce['url']}>: non verificata, saltata")
+        elif curated_solo_link(voce):
+            stats["solo_link"] += 1
+            togli_gia_scaricata(voce)
+            store.error(f"{voce['titolo']} <{voce['url']}>: solo link, non scaricata")
+        else:
+            voci.append(voce)
+
+    def fetch(voce: dict) -> tuple[str, bool]:
         url = voce["url"]
+        doc_url = voce.get("documento") or url
+        sospetta = False
         try:
-            content = http.get(url).content
+            content = http.get(doc_url).content
             if not content:
                 raise RuntimeError("risposta vuota")
             ext = ".pdf" if content.lstrip().startswith(b"%PDF-") else ".html"
             if ext == ".html" and len(norm_text(BeautifulSoup(content, "html.parser").get_text(" "))) < CURATED_MIN_TEXT:
                 # Moduli di reindirizzamento, pagine che vivono di JavaScript: niente da indicizzare.
                 raise RuntimeError("pagina senza testo (reindirizzamento o contenuto caricato da JavaScript)")
+            if ext == ".html":
+                motivi = misura_testo_utile.sospetti(misura_testo_utile.misura(content))
+                if motivi:
+                    sospetta = True
+                    store.error(f"{voce['titolo']} <{doc_url}>: pagina sospetta: {'; '.join(motivi)}"
+                                " (valutare solo_link o documento nell'elenco curato)")
+                    print(f"  ? pagina sospetta: {voce['titolo']}: {'; '.join(motivi)}")
             sha = hashlib.sha256(content).hexdigest()
             old = store.existing.get(url)
             have_old = mode == "refresh" and store.has_file(old)
             if have_old and old.get("sha256") == sha:
-                return "unchanged"
+                return "unchanged", sospetta
+            if have_old and sospetta and not curated_sospetto(store.root / old["local_file"]):
+                # Pagina di blocco (captcha, accesso negato) al posto di un documento buono.
+                store.error(f"{voce['titolo']} <{doc_url}>: nuova versione sospetta, tenuta la versione precedente")
+                print(f"  = tenuta la versione precedente: {voce['titolo']}")
+                return "tenute_precedenti", sospetta
             out = store.files / f"{curated_slug(voce['titolo'])}{ext}"
             write_atomic(out, content)
             if have_old and store.root / old["local_file"] != out:
@@ -1956,7 +2005,7 @@ def curated_source(http: Http, store: Store, source_name: str, cfg: dict, mode: 
                 authority=voce["ente"],
                 document_type=voce["tipo"],
                 detail_url=url,
-                download_url=url,
+                download_url=doc_url,
                 local_file=str(out.relative_to(store.root)),
                 sha256=sha,
                 downloaded_at=now_iso(),
@@ -1967,18 +2016,20 @@ def curated_source(http: Http, store: Store, source_name: str, cfg: dict, mode: 
             if have_old:
                 store.error(f"{voce['titolo']} <{url}>: aggiornato")
                 print(f"  ~ aggiornato: {out.name}")
-                return "updated"
+                return "updated", sospetta
             print(f"  + {voce['titolo']} -> files/{out.name}")
-            return "downloaded"
+            return "downloaded", sospetta
         except Exception as e:
-            store.error(f"{voce['titolo']} <{url}>: {e}")
+            store.error(f"{voce['titolo']} <{doc_url}>: {e}")
             print(f"  ! {voce['titolo']}: {e}")
-            return "errors"
+            return "errors", sospetta
 
-    for outcome in http.map(fetch, voci):
+    for outcome, sospetta in http.map(fetch, voci):
         stats[outcome] += 1
+        stats["sospette"] += sospetta
     print(f"  {stats['downloaded']} scaricati, {stats['updated']} aggiornati, {stats['unchanged']} invariati, "
-          f"{stats['skipped_unverified']} non verificati saltati, {stats['errors']} errori")
+          f"{stats['skipped_unverified']} non verificati saltati, {stats['solo_link']} solo link, "
+          f"{stats['sospette']} sospette, {stats['tenute_precedenti']} tenute le precedenti, {stats['errors']} errori")
     return stats
 
 

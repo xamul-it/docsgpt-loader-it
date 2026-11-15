@@ -446,7 +446,7 @@ class FakeFetcher:
 class CuratedTest(unittest.TestCase):
     """Kind "curated": elenco curato in YAML, una sorgente per amministrazione."""
 
-    HTML = b"<html><body>" + b"Regolamento dell'imposta di soggiorno. " * 10 + b"</body></html>"
+    HTML = b"<html><body>" + b"Regolamento dell'imposta di soggiorno. " * 30 + b"</body></html>"
     PDF = b"%PDF-1.4 tariffe"
     URL_HTML = "https://www.comune.prova.it/regolamento"
     URL_PDF = "https://www.comune.prova.it/tariffe.pdf"
@@ -529,7 +529,7 @@ class CuratedTest(unittest.TestCase):
 
     def test_refresh_con_sha_cambiato_sovrascrive_e_registra_aggiornato(self):
         self.run_source({self.URL_HTML: self.HTML, self.URL_PDF: self.PDF})
-        nuovo = b"<html><body>" + b"Regolamento modificato. " * 20 + b"</body></html>"
+        nuovo = b"<html><body>" + b"Regolamento modificato. " * 50 + b"</body></html>"
         _, _, stats = self.run_source({self.URL_HTML: nuovo, self.URL_PDF: self.PDF})
         self.assertEqual((stats["downloaded"], stats["updated"], stats["unchanged"]), (0, 1, 1))
         root = self.root / "archivio" / "locazioni/comune-prova"
@@ -559,6 +559,98 @@ class CuratedTest(unittest.TestCase):
         self.assertEqual((stats["downloaded"], stats["errors"]), (1, 1))
         log = (self.root / "archivio" / "locazioni/comune-prova" / "errors.log").read_text(encoding="utf-8")
         self.assertIn("senza testo", log)
+
+    def voce(self, titolo="Regolamento imposta di soggiorno", **campi):
+        """Aggiunge campi alla voce già caricata (come se fossero nello YAML)."""
+        v = next(v for v in self.sources["locazioni/comune-prova"]["voci"] if v["titolo"] == titolo)
+        v.update(campi)
+        return v
+
+    def log(self):
+        return (self.root / "archivio" / "locazioni/comune-prova" / "errors.log").read_text(encoding="utf-8")
+
+    def test_solo_link_non_scarica(self):
+        self.voce(solo_link="si")
+        http, _, stats = self.run_source({self.URL_PDF: self.PDF})
+        self.assertNotIn(self.URL_HTML, http.urls)
+        self.assertEqual((stats["downloaded"], stats["solo_link"], stats["errors"]), (1, 1, 0))
+        self.assertIn("solo link", self.log())
+        self.assertEqual([r["title"] for r in self.manifest()], ["Tariffe 2026"])
+
+    def test_solo_link_al_refresh_toglie_file_e_riga_gia_scaricati(self):
+        self.run_source({self.URL_HTML: self.HTML, self.URL_PDF: self.PDF})
+        self.voce(solo_link="si")
+        self.run_source({self.URL_PDF: self.PDF})
+        self.assertEqual([r["title"] for r in self.manifest()], ["Tariffe 2026"])
+        files = sorted(p.name for p in (self.root / "archivio" / "locazioni/comune-prova" / "files").iterdir())
+        self.assertEqual(files, ["tariffe-2026.pdf"])
+
+    def test_voce_non_piu_verificata_al_refresh_toglie_file_e_riga(self):
+        self.run_source({self.URL_HTML: self.HTML, self.URL_PDF: self.PDF})
+        self.voce(verificato="no")
+        self.run_source({self.URL_PDF: self.PDF})
+        self.assertEqual([r["title"] for r in self.manifest()], ["Tariffe 2026"])
+        files = sorted(p.name for p in (self.root / "archivio" / "locazioni/comune-prova" / "files").iterdir())
+        self.assertEqual(files, ["tariffe-2026.pdf"])
+
+    def test_documento_scarica_il_file_collegato_al_posto_della_scheda(self):
+        pdf_url = "https://www.comune.prova.it/regolamento.pdf/@@download/file"
+        self.voce(documento=pdf_url)
+        http, _, stats = self.run_source({pdf_url: self.PDF, self.URL_PDF: self.PDF})
+        self.assertNotIn(self.URL_HTML, http.urls)
+        self.assertEqual(stats["downloaded"], 2)
+        r = {r["title"]: r for r in self.manifest()}["Regolamento imposta di soggiorno"]
+        self.assertEqual((r["detail_url"], r["download_url"]), (self.URL_HTML, pdf_url))
+        self.assertEqual(r["local_file"], "files/regolamento-imposta-di-soggiorno.pdf")
+        # Al refresh la voce si ritrova dalla scheda: invariata, non riscaricata come nuova.
+        _, _, stats = self.run_source({pdf_url: self.PDF, self.URL_PDF: self.PDF})
+        self.assertEqual((stats["downloaded"], stats["unchanged"]), (0, 2))
+
+    def test_pagina_sospetta_scaricata_ma_segnalata(self):
+        # Scheda che annuncia un PDF: molto menu, poche righe utili nel <main>.
+        menu = "<nav>" + "Voce di menu del portale regionale " * 40 + "</nav>"
+        scheda = f"<html><body>{menu}<main>È stata emanata la circolare (PDF).</main></body></html>".encode()
+        _, _, stats = self.run_source({self.URL_HTML: scheda, self.URL_PDF: self.PDF})
+        self.assertEqual((stats["downloaded"], stats["sospette"], stats["errors"]), (2, 1, 0))
+        self.assertIn("pagina sospetta", self.log())
+        self.assertIn("testo utile", self.log())
+
+    def test_refresh_con_pagina_di_blocco_tiene_la_versione_buona(self):
+        # Ministero del Turismo il 2026-11-15: al posto del comunicato la pagina captcha di Radware.
+        self.run_source({self.URL_HTML: self.HTML, self.URL_PDF: self.PDF})
+        captcha = b"<html><head><title>Radware Captcha Page</title></head><body><div>" + b"Verifica di essere umano. " * 10 + b"</div></body></html>"
+        _, _, stats = self.run_source({self.URL_HTML: captcha, self.URL_PDF: self.PDF})
+        self.assertEqual((stats["updated"], stats["tenute_precedenti"], stats["sospette"]), (0, 1, 1))
+        root = self.root / "archivio" / "locazioni/comune-prova"
+        self.assertEqual((root / "files/regolamento-imposta-di-soggiorno.html").read_bytes(), self.HTML)
+        r = {r["title"]: r for r in self.manifest()}["Regolamento imposta di soggiorno"]
+        self.assertEqual(r["sha256"], hashlib.sha256(self.HTML).hexdigest())
+        self.assertIn("tenuta la versione precedente", self.log())
+
+    def test_refresh_di_pagina_gia_sospetta_si_aggiorna(self):
+        corta = b"<html><body><main>" + b"Delibera approvata, vedi PDF. " * 10 + b"</main></body></html>"
+        self.run_source({self.URL_HTML: corta, self.URL_PDF: self.PDF})
+        nuova = b"<html><body><main>" + b"Delibera approvata e modificata, vedi PDF. " * 10 + b"</main></body></html>"
+        _, _, stats = self.run_source({self.URL_HTML: nuova, self.URL_PDF: self.PDF})
+        self.assertEqual((stats["updated"], stats["tenute_precedenti"]), (1, 0))
+
+    def test_pagina_di_login_segnalata(self):
+        login = ("<html><body><main>" + "Portale per i gestori delle strutture ricettive. " * 30
+                 + '<form><input type="password"></form></main></body></html>').encode()
+        _, _, stats = self.run_source({self.URL_HTML: login, self.URL_PDF: self.PDF})
+        self.assertEqual(stats["sospette"], 1)
+        self.assertIn("password", self.log())
+
+    def test_pagina_buona_non_segnalata(self):
+        _, _, stats = self.run_source({self.URL_HTML: self.HTML, self.URL_PDF: self.PDF})
+        self.assertEqual(stats["sospette"], 0)
+        self.assertNotIn("sospetta", self.log())
+
+    def test_solo_link_e_documento_insieme_rifiutati(self):
+        text = CURATED_YAML.replace('        note: ""\n', '        note: ""\n        solo_link: "si"\n        documento: "https://x.it/a.pdf"\n', 1)
+        self.yaml_path.write_text(text, encoding="utf-8")
+        with self.assertRaises(ValueError):
+            d.curated_sources(self.yaml_path)
 
     def test_sorgente_senza_voci_non_fallisce(self):
         _, _, stats = self.run_source({}, name="locazioni/regione-prova")
