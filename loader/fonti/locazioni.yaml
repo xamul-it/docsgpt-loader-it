@@ -6,6 +6,9 @@
 # Nota: il testo di Normattiva risulta HTML statico (JS solo per navigazione); per atti lunghi (codice civile) usare "visualizza atto intero"/export.
 # Nota: le date di Normattiva/Regioni nel 2026 sono quelle riportate dalle pagine al momento della verifica.
 
+# Gruppo di tutte le sorgenti del file nell'elenco delle fonti del server MCP.
+gruppo: "Locazioni"
+
 sorgenti:
 
   - id: locazioni-nazionale-affitti-brevi
@@ -126,7 +129,8 @@ sorgenti:
         data_documento: "2017-01-16 (GU 2017-03-15)"
         aggiornamento_atteso: raro
         verificato: "si"
-        note: "Pagina GU HTML con articoli 1-7 e Allegati A-E come link a pagine separate (non letti). Dal testo del decreto (copia ANCE letta): Allegato D = Tabella oneri accessori locatore/conduttore; A-C = contratti tipo; E = procedura di conciliazione. Per scaricare allegati servono le singole pagine/PDF GU; il PDF integrale GU e scansione OCR sporca. Il sito GU ha anche un guscio JS ('Gazzetta in fase di caricamento') su altri URL."
+        solo_link: "si"
+        note: "Pagina GU HTML con articoli 1-7 e Allegati A-E come link a pagine separate (non letti). Dal testo del decreto (copia ANCE letta): Allegato D = Tabella oneri accessori locatore/conduttore; A-C = contratti tipo; E = procedura di conciliazione. Per scaricare allegati servono le singole pagine/PDF GU; il PDF integrale GU e scansione OCR sporca. Il sito GU ha anche un guscio JS ('Gazzetta in fase di caricamento') su altri URL. [2026-11-15, issue #3] La pagina GU e solo l'indice dell'atto (738 caratteri utili): solo link. Il testo del decreto viene dalla copia ANCE (voce seguente); gli allegati A-E restano da scaricare a parte."
       - titolo: "DM 16 gennaio 2017 - testo del decreto (copia testuale, senza allegati)"
         ente: "ANCE (copia)"
         livello: nazionale
@@ -208,7 +212,8 @@ sorgenti:
         data_documento: "2024-09-05"
         aggiornamento_atteso: raro
         verificato: "si"
-        note: "Scheda HTML della circolare; il PDF e allegato (url PDF: .../documenti/circolare-cin.pdf/@@download/file/circolare%20Cin.pdf, non aperto). Dal 2024-11-02 il CIN sostituisce il CIR nelle attivita promozionali (da pagina regionale)."
+        documento: "https://imprese.regione.emilia-romagna.it/turismo/ambiti/documenti/circolare-cin.pdf/@@download/file"
+        note: "Scheda HTML della circolare; il PDF e allegato (url PDF: .../documenti/circolare-cin.pdf/@@download/file/circolare%20Cin.pdf, non aperto). Dal 2024-11-02 il CIN sostituisce il CIR nelle attivita promozionali (da pagina regionale). [2026-11-15, issue #3] La scheda ha 553 caratteri utili: si scarica il PDF della circolare (aperto, 318 KB, intestazione Direzione generale ai SUAP)."
       - titolo: "Modifiche alla disciplina delle locazioni brevi e turistiche non imprenditoriali (L. 199/2025) - circolare prot. 72284 del 4 febbraio 2026"
         ente: "Regione Emilia-Romagna - Settore Turismo, Commercio, Economia urbana, Sport"
         livello: regionale
@@ -219,7 +224,8 @@ sorgenti:
         data_documento: "2026-02-04 (pagina agg. 2026-04-08)"
         aggiornamento_atteso: occasionale
         verificato: "si"
-        note: "Il PDF della circolare (.../documenti/circolare_numero_massimo_appartamenti.pdf/@@download/file) e stato scaricato e letto: massimo 2 appartamenti in forma non imprenditoriale dal 2026-01-01, oltre SCIA (FAQ 7.2 BDSR)."
+        documento: "https://imprese.regione.emilia-romagna.it/turismo/ambiti/documenti/circolare_numero_massimo_appartamenti.pdf/@@download/file"
+        note: "Il PDF della circolare (.../documenti/circolare_numero_massimo_appartamenti.pdf/@@download/file) e stato scaricato e letto: massimo 2 appartamenti in forma non imprenditoriale dal 2026-01-01, oltre SCIA (FAQ 7.2 BDSR). [2026-11-15, issue #3] La scheda ha 639 caratteri utili: si scarica il PDF della circolare (aperto, 229 KB)."
       - titolo: "Ross1000 - Manuale profilo albergatore, inserimento clienti"
         ente: "Regione Emilia-Romagna - Statistica"
         livello: regionale
@@ -230,7 +236,8 @@ sorgenti:
         data_documento: sconosciuta
         aggiornamento_atteso: "occasionale"
         verificato: "si"
-        note: "Aperta la pagina regionale 'Manuale Ross1000 - Profilo Albergatore - Inserimento clienti' (il PDF collegato, 'Profilo struttura - Caricamento manuale', non e stato aperto; l'URL .pdf indicato qui e quello del risultato di ricerca). E un manuale per la struttura ricettiva, non specifico per locazioni turistiche. Non trovata una fonte regionale ufficiale sull'obbligo statistico per le locazioni turistiche (solo blog commerciali)."
+        documento: "https://statistica.regione.emilia-romagna.it/metadati/rilevazioni/turismo/allegati-rilevazioni-turismo/manuali-e-tracciati-rilevazioni-turismo/manuale-ross1000-inserimento-clienti.pdf/@@download/file"
+        note: "Aperta la pagina regionale 'Manuale Ross1000 - Profilo Albergatore - Inserimento clienti' (il PDF collegato, 'Profilo struttura - Caricamento manuale', non e stato aperto; l'URL .pdf indicato qui e quello del risultato di ricerca). E un manuale per la struttura ricettiva, non specifico per locazioni turistiche. Non trovata una fonte regionale ufficiale sull'obbligo statistico per le locazioni turistiche (solo blog commerciali). [2026-11-15, issue #3] L'URL .pdf qui sopra risponde con la pagina html della scheda (79 caratteri utili): si scarica il PDF linkato dalla scheda (aperto, 1,9 MB, 'Manuale d'uso Ross 1000 - Profilo struttura ricettiva caricamento manuale', v. 2 del 27/07/22)."
 
   - id: regione-valle-aosta
     nome: "Locazioni - Regione Valle d'Aosta"
@@ -350,7 +357,8 @@ sorgenti:
         data_documento: "2024-12-31 (ultima modifica indicata: L.R. 16 giugno 2026, n. 9)"
         aggiornamento_atteso: "frequente (testo coordinato aggiornato a ogni modifica)"
         verificato: "si"
-        note: "Pagina HTML 'Testo coordinato' (non ufficiale; vale il BURT). L'estrazione ha dato indice e note, non il corpo degli articoli: potrebbe caricare il testo con JS o in fragment. Disponibili download PDF/XML (Akoma Ntoso): il PDF e raggiungibile da download_doc.php?id=...&ext=pdf (es. id 5219d4f2-d4f0-11ef-b084-005056959b60 e' la versione originale, non il coordinato). Corte cost. n. 186/2025 ha respinto le questioni su art. 59."
+        documento: "https://raccoltanormativa.consiglio.regione.toscana.it/articolo?urndoc=urn:nir:regione.toscana:legge:2024-12-31;61&pr=idx,0;artic,1;articparziale,0"
+        note: "Pagina HTML 'Testo coordinato' (non ufficiale; vale il BURT). L'estrazione ha dato indice e note, non il corpo degli articoli: potrebbe caricare il testo con JS o in fragment. Disponibili download PDF/XML (Akoma Ntoso): il PDF e raggiungibile da download_doc.php?id=...&ext=pdf (es. id 5219d4f2-d4f0-11ef-b084-005056959b60 e' la versione originale, non il coordinato). Corte cost. n. 186/2025 ha respinto le questioni su art. 59. [2026-11-15, issue #3] Il testo c'e, ma non a questo url: la pagina base ha solo indice e note. Si scarica 'Visualizza tutto il testo' (aperto: 205.509 caratteri, 155 articoli, art. 59-61 compresi)."
       - titolo: "DPGR 11 agosto 2025, n. 47/R - Regolamento di attuazione della L.R. 61/2024"
         ente: "Consiglio regionale Toscana - Raccolta normativa"
         livello: regionale
@@ -361,7 +369,8 @@ sorgenti:
         data_documento: "2025-08-11 (BURT 2025-08-14, in vigore 2025-08-29)"
         aggiornamento_atteso: occasionale
         verificato: "si"
-        note: "Identificato (indice: 6 titoli, allegati A-J). Dall'indice il regolamento riguarda soprattutto strutture ricettive, stabilimenti balneari e professioni: NON risulta disciplinare le locazioni turistiche (che sono in L.R. artt. 59-61). Corpo articoli non letto."
+        documento: "https://raccoltanormativa.consiglio.regione.toscana.it/articolo?urndoc=urn:nir:regione.toscana:regolamento.giunta:2025-08-11;47/R&pr=idx,0;artic,1;articparziale,0"
+        note: "Identificato (indice: 6 titoli, allegati A-J). Dall'indice il regolamento riguarda soprattutto strutture ricettive, stabilimenti balneari e professioni: NON risulta disciplinare le locazioni turistiche (che sono in L.R. artt. 59-61). Corpo articoli non letto. [2026-11-15, issue #3] La pagina base ha solo indice e note: si scarica 'Visualizza tutto il testo' (aperto: 74.475 caratteri, 62 articoli)."
       - titolo: "MOtourist Office Toscana - registrazione per comunicazione locazioni turistiche (CIR, flussi statistici)"
         ente: "Regione Toscana (gestito dal Comune di Follonica dal 2026)"
         livello: regionale
@@ -372,7 +381,8 @@ sorgenti:
         data_documento: sconosciuta
         aggiornamento_atteso: frequente
         verificato: "si"
-        note: "Pagina di registrazione (codice fiscale, password): serve account, contenuti informativi limitati. Dal PDF del Comune di Castiglione: il portale rilascia il CIR necessario per ottenere il CIN. Non trovata documentazione normativa/manuale ufficiale pubblica sulla comunicazione statistica (Turismo5/MOtourist)."
+        solo_link: "si"
+        note: "Pagina di registrazione (codice fiscale, password): serve account, contenuti informativi limitati. Dal PDF del Comune di Castiglione: il portale rilascia il CIR necessario per ottenere il CIN. Non trovata documentazione normativa/manuale ufficiale pubblica sulla comunicazione statistica (Turismo5/MOtourist). [2026-11-15, issue #3] Modulo di registrazione con campo password: solo link."
       - titolo: "Portale CIR/CIN Regione Toscana (pagina regionale su locazioni turistiche) - non individuata"
         ente: "Regione Toscana"
         livello: regionale
@@ -612,8 +622,8 @@ sorgenti:
         formato: pdf
         data_documento: "2020-01-17"
         aggiornamento_atteso: "triennale"
-        verificato: "si"
-        note: "Aperta solo la scheda dell'attestazione di rispondenza (Ufficio IMU; PDF modulo), NON il testo dell'accordo. L'accordo riguarda il solo Comune di Aosta: per Pre-Saint-Didier non risulta un accordo locale (senza accordo vale il contratto ponte/DM 16/01/2017). Notizia CELVA sull'accordo 2019 (celva.it ...nuovi-accordi-territoriali-aosta-2019/) restituisce 404."
+        verificato: "no"
+        note: "Aperta solo la scheda dell'attestazione di rispondenza (Ufficio IMU; PDF modulo), NON il testo dell'accordo. L'accordo riguarda il solo Comune di Aosta: per Pre-Saint-Didier non risulta un accordo locale (senza accordo vale il contratto ponte/DM 16/01/2017). Notizia CELVA sull'accordo 2019 (celva.it ...nuovi-accordi-territoriali-aosta-2019/) restituisce 404. [2026-11-15, issue #3] Non verificata: l'url apre la scheda dell'attestazione di rispondenza (modulo IMU, 415 caratteri utili), non l'accordo del titolo. Cercare il testo dell'accordo."
 
   - id: comune-castiglione-pescaia
     nome: "Locazioni - Comune di Castiglione della Pescaia"
@@ -629,7 +639,8 @@ sorgenti:
         data_documento: "pagina agg. 2026-07-28"
         aggiornamento_atteso: "annuale"
         verificato: "si"
-        note: "Indice di 8 PDF: adempimenti locazioni turistiche brevi (dal 2026-06-26), tariffe 2026, tariffe 2025, regolamento 2025, moduli Staytour/esenzione."
+        solo_link: "si"
+        note: "Indice di 8 PDF: adempimenti locazioni turistiche brevi (dal 2026-06-26), tariffe 2026, tariffe 2025, regolamento 2025, moduli Staytour/esenzione. [2026-11-15, issue #3] Indice di PDF (748 caratteri utili): solo link. Tariffe 2026, regolamento e adempimenti sono voci proprie."
       - titolo: "Deliberazione Giunta n. 358 del 20/11/2025 - Tariffe imposta di soggiorno anno 2026"
         ente: "Comune di Castiglione della Pescaia"
         livello: comunale
@@ -673,7 +684,8 @@ sorgenti:
         data_documento: sconosciuta
         aggiornamento_atteso: n/a
         verificato: "si"
-        note: "Pagina di LOGIN (SPID/CIE) per i gestori: nessun contenuto informativo. Non scaricabile: solo link da documentare."
+        solo_link: "si"
+        note: "Pagina di LOGIN (SPID/CIE) per i gestori: nessun contenuto informativo. Non scaricabile: solo link da documentare. [2026-11-15, issue #3] Pagina di login a frame: solo link."
       - titolo: "Accordo territoriale canone concordato - Castiglione della Pescaia / provincia di Grosseto (accordo quadro Comune di Grosseto 25/7/2025)"
         ente: "Comune di Grosseto"
         livello: comunale

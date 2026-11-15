@@ -1,0 +1,343 @@
+# DocsGPT from pre-built images, with no git checkout.
+#
+#   curl -fsSLO https://raw.githubusercontent.com/arc53/DocsGPT/main/deployment/docker-compose-standalone.yaml
+#   printf 'LLM_PROVIDER=docsgpt\nVITE_API_STREAMING=true\nINTERNAL_KEY=%s\n' "$(openssl rand -hex 16)" > .env
+#   docker compose -f docker-compose-standalone.yaml up -d
+#   open http://localhost:7091
+#
+# INTERNAL_KEY is the shared secret the worker uses to hand finished indexes to
+# the API; without it every ingest fails with a 401 (setup.sh generates one).
+#
+# The backend image serves the web UI and the API on one port. Every release
+# also attaches this file as an asset, and `docsgpt up` runs it from the Python
+# package. Settings come from .env next to this file (any DocsGPT setting,
+# VITE_* included; the compose-internal service URLs below take precedence).
+# Data lives in named volumes, so `docker compose down` keeps it and
+# `docker compose down -v` removes it.
+#
+#   DOCSGPT_IMAGE_TAG      release to run, e.g. 0.20.0 (default: latest release);
+#                          develop follows the main branch
+#   DOCSGPT_IMAGE_VARIANT  empty (slim, default) or -docling: docling parser
+#                          engine, its models, and tesseract baked in (OCR-ready)
+#   DOCSGPT_BIND           interface the port is published on: 127.0.0.1 (default,
+#                          this machine only) or 0.0.0.0 (every interface; set
+#                          AUTH_TYPE, see the DocsGPT settings guide)
+#   DOCSGPT_PORT           host port for the UI and API (default: 7091)
+#   POSTGRES_PASSWORD      database password (default: docsgpt). Read when the
+#                          postgres volume is first created; changing it later
+#                          does not change the existing database's password.
+#                          Use URL-safe characters (e.g. openssl rand -hex 24).
+#   DOCSGPT_DOMAIN         public domain for the `https` profile (below)
+#   EMBEDDINGS_NAME        defaults to granite here (this stack always starts on
+#                          fresh volumes, so there is no older index to keep
+#                          compatible); the code default stays mpnet for upgrades.
+#
+# HTTPS for a public domain: point the domain's DNS at this machine, open ports
+# 80 and 443, then
+#   DOCSGPT_DOMAIN=docs.example.com docker compose -f docker-compose-standalone.yaml --profile https up -d
+# Caddy obtains and renews the certificate and proxies to the backend. Putting
+# DOCSGPT_DOMAIN and COMPOSE_PROFILES=https in .env instead makes every later
+# `up`, `down` and `logs` include Caddy without the flag.
+name: docsgpt
+
+services:
+  backend:
+    image: arc53/docsgpt:${DOCSGPT_IMAGE_TAG:-latest}${DOCSGPT_IMAGE_VARIANT:-}
+    # Same as docker-compose-hub.yaml: the data volumes are written by root so
+    # any image tag works, including releases that predate the appuser-owned
+    # /app/inputs, /app/indexes and /app/vectors directories.
+    user: root
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - CACHE_REDIS_URL=redis://redis:6379/2
+      - POSTGRES_URI=postgresql://docsgpt:${POSTGRES_PASSWORD:-docsgpt}@postgres:5432/docsgpt
+      - EMBEDDINGS_NAME=${EMBEDDINGS_NAME:-ibm-granite/granite-embedding-311m-multilingual-r2}
+      # Upload caps set far beyond anything the fiscal archive can reach (the
+      # defaults are 256 MB / 100 MB / 250 MB / 10k files): each ente is
+      # uploaded as one zip and a rejected upload wastes hours. 1 TiB, 100M
+      # files, no practical compression-ratio cap. Override in .env if needed.
+      # Keep the worker's copy below in sync: it reads the same settings.
+      # INTENTIONAL, reviewed 2026-11-14: do not lower these defaults or flag
+      # them as a zip-bomb risk. Uploads come only from the owner's own
+      # pipeline; see "Decisioni prese" in CLAUDE.md.
+      - UPLOAD_MAX_REQUEST_BYTES=${UPLOAD_MAX_REQUEST_BYTES:-1099511627776}
+      - UPLOAD_MAX_FILE_BYTES=${UPLOAD_MAX_FILE_BYTES:-1099511627776}
+      - UPLOAD_MAX_ARCHIVE_BYTES=${UPLOAD_MAX_ARCHIVE_BYTES:-1099511627776}
+      - UPLOAD_MAX_ARCHIVE_FILES=${UPLOAD_MAX_ARCHIVE_FILES:-100000000}
+      - UPLOAD_MAX_ARCHIVE_RATIO=${UPLOAD_MAX_ARCHIVE_RATIO:-1000000}
+      # Embeddings come from the GPU server below instead of the built-in CPU
+      # runner (~25x faster). Set EMBEDDINGS_BASE_URL= (empty) in .env to go
+      # back to CPU; indexes built on one are only approximately compatible
+      # with the other (cosine ~0.97), so re-ingest after switching.
+      - EMBEDDINGS_BASE_URL=${EMBEDDINGS_BASE_URL-http://embeddings:80}
+      - EMBEDDINGS_BATCH_SIZE=${EMBEDDINGS_BATCH_SIZE:-64}
+      # The broker re-delivers a task not finished within this window (default
+      # 1 h): on longer ingests a duplicate starts, fails and can briefly mark
+      # the task as failed. 7 days, so no ingest is ever re-delivered.
+      - CELERY_VISIBILITY_TIMEOUT=${CELERY_VISIBILITY_TIMEOUT:-604800}
+      # Vectors live in the pgvector service below instead of per-source FAISS
+      # files: FAISS reloads a source's whole index on every search (6-9 s on a
+      # 366k-chunk source). Sources ingested under one store are invisible to
+      # the other, so re-ingest after changing this.
+      - VECTOR_STORE=${VECTOR_STORE:-pgvector}
+      - PGVECTOR_CONNECTION_STRING=postgresql://docsgpt:${POSTGRES_PASSWORD:-docsgpt}@pgvector:5432/docsgpt_vectors
+    # A model server on the host (Ollama, vLLM, ...) is reachable as
+    # host.docker.internal on Linux too, as it is on Docker Desktop.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${DOCSGPT_BIND:-127.0.0.1}:${DOCSGPT_PORT:-7091}:7091"
+    volumes:
+      - ./data/inputs:/app/inputs
+      - ./data/indexes:/app/indexes
+      - ./data/vectors:/app/vectors
+      # Lifts Flask's 500 KB form-field cap; see the file for why.
+      - ./patches/flask_form_limit.py:/venv/lib/python3.12/site-packages/flask_form_limit.py:ro
+      - ./patches/flask_form_limit.pth:/venv/lib/python3.12/site-packages/flask_form_limit.pth:ro
+      # Makes the UI's source boxes link to the original document under
+      # /docs/ (served by the host's Apache); see the file's header.
+      - ./patches/labels.py:/app/docsgpt/retriever/labels.py:ro
+      # Adds the same link ("url") to /api/search and MCP search_docs hits,
+      # so Claude can cite clickable documents; see the file's header.
+      - ./patches/search_service.py:/app/docsgpt/services/search_service.py:ro
+      # MCP search_docs: distinct documents with passages, Italian description.
+      - ./patches/mcp_server.py:/app/docsgpt/mcp_server.py:ro
+      # Source lists (nome, gruppo, descrizione) read by the MCP list_sources
+      # tool and the search_docs "sources" filter; a folder, not single files,
+      # so that atomic rewrites of the YAMLs show up without a restart.
+      - ./loader/fonti:/app/fonti:ro
+      - ./data/doc_links:/app/doc_links:ro
+    depends_on:
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      embeddings:
+        condition: service_started
+      pgvector:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    image: arc53/docsgpt:${DOCSGPT_IMAGE_TAG:-latest}${DOCSGPT_IMAGE_VARIANT:-}
+    user: root
+    # Consumes the default queue plus `parsing` (read_document) and `embeddings`
+    # (query embedding); without the latter every search times out.
+    command: celery -A docsgpt.app.celery worker -l INFO -B --concurrency=${CELERY_CONCURRENCY:-2} -Q docsgpt,parsing,embeddings
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - CACHE_REDIS_URL=redis://redis:6379/2
+      - POSTGRES_URI=postgresql://docsgpt:${POSTGRES_PASSWORD:-docsgpt}@postgres:5432/docsgpt
+      - API_URL=http://backend:7091
+      - EMBEDDINGS_NAME=${EMBEDDINGS_NAME:-ibm-granite/granite-embedding-311m-multilingual-r2}
+      # Same upload caps and embedding server as the backend.
+      - UPLOAD_MAX_REQUEST_BYTES=${UPLOAD_MAX_REQUEST_BYTES:-1099511627776}
+      - UPLOAD_MAX_FILE_BYTES=${UPLOAD_MAX_FILE_BYTES:-1099511627776}
+      - UPLOAD_MAX_ARCHIVE_BYTES=${UPLOAD_MAX_ARCHIVE_BYTES:-1099511627776}
+      - UPLOAD_MAX_ARCHIVE_FILES=${UPLOAD_MAX_ARCHIVE_FILES:-100000000}
+      - UPLOAD_MAX_ARCHIVE_RATIO=${UPLOAD_MAX_ARCHIVE_RATIO:-1000000}
+      - EMBEDDINGS_BASE_URL=${EMBEDDINGS_BASE_URL-http://embeddings:80}
+      - EMBEDDINGS_BATCH_SIZE=${EMBEDDINGS_BATCH_SIZE:-64}
+      # The broker re-delivers a task not finished within this window (default
+      # 1 h): on longer ingests a duplicate starts, fails and can briefly mark
+      # the task as failed. 7 days, so no ingest is ever re-delivered.
+      - CELERY_VISIBILITY_TIMEOUT=${CELERY_VISIBILITY_TIMEOUT:-604800}
+      # Vectors live in the pgvector service below instead of per-source FAISS
+      # files: FAISS reloads a source's whole index on every search (6-9 s on a
+      # 366k-chunk source). Sources ingested under one store are invisible to
+      # the other, so re-ingest after changing this.
+      - VECTOR_STORE=${VECTOR_STORE:-pgvector}
+      - PGVECTOR_CONNECTION_STRING=postgresql://docsgpt:${POSTGRES_PASSWORD:-docsgpt}@pgvector:5432/docsgpt_vectors
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./data/inputs:/app/inputs
+      - ./data/indexes:/app/indexes
+      - ./data/vectors:/app/vectors
+    depends_on:
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      embeddings:
+        condition: service_started
+      pgvector:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # GPU embedding server (Hugging Face Text Embeddings Inference) serving the
+  # same granite model as EMBEDDINGS_NAME, OpenAI-compatible on /v1/embeddings.
+  # Not used until EMBEDDINGS_BASE_URL=http://embeddings:80 is set on backend
+  # and worker. It runs the fp32/fp16 weights, while the built-in CPU runner
+  # uses the int8-quantised ONNX graph: vectors are close but not identical.
+  # Published on localhost only, for testing from the host.
+  embeddings:
+    image: ghcr.io/huggingface/text-embeddings-inference:cuda-1.9.4
+    command:
+      - --model-id=ibm-granite/granite-embedding-311m-multilingual-r2
+      - --revision=44399559930365213510b1ee2eb15ded83374f0e
+      - --pooling=cls
+      - --max-client-batch-size=64
+    ports:
+      - "127.0.0.1:${DOCSGPT_EMBEDDINGS_PORT:-7092}:80"
+    volumes:
+      - ./data/embeddings-models:/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # Vector store for all sources (see VECTOR_STORE above). A separate Postgres
+  # from the application database: that one runs the stock alpine image, which
+  # has no pgvector extension.
+  pgvector:
+    image: pgvector/pgvector:0.8.1-pg17
+    environment:
+      - POSTGRES_USER=docsgpt
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-docsgpt}
+      - POSTGRES_DB=docsgpt_vectors
+    # Sized for exact scans over a few million 768-d vectors on a 30 GB host.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=6GB
+      - -c
+      - effective_cache_size=16GB
+      - -c
+      - maintenance_work_mem=2GB
+      - -c
+      - max_parallel_workers_per_gather=8
+      - -c
+      - max_parallel_workers=12
+      - -c
+      - max_worker_processes=16
+      - -c
+      - max_wal_size=8GB
+    shm_size: 1g
+    volumes:
+      - ./data/pgvector:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docsgpt -d docsgpt_vectors"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # Test SMTP server: captures every mail instead of delivering it and shows it
+  # in a web UI (http://localhost:8025). The notifier sends here by default.
+  mailpit:
+    image: axllent/mailpit:latest
+    environment:
+      - MP_MAX_MESSAGES=5000
+      - MP_DATABASE=/data/mailpit.db
+    ports:
+      - "${MAILPIT_BIND:-127.0.0.1}:${MAILPIT_PORT:-8025}:8025"
+    volumes:
+      - ./data/mailpit:/data
+    restart: unless-stopped
+
+  # Watches the Agenzia Entrate RSS feed and the fiscal archive; each new
+  # document is added to the small DocsGPT source NOVITA_SOURCE_NAME (adding to
+  # a big source makes DocsGPT re-read all of it), summarised with the prompt
+  # SUMMARY_PROMPT_NAME and mailed. See notifier/notifier.py. SMTP defaults to
+  # mailpit above; point SMTP_* at a real server in .env to deliver for real.
+  notifier:
+    build: ./notifier
+    # The archive owner, so downloaded files stay editable from the host.
+    user: "${NOTIFIER_UID:-1000}:${NOTIFIER_GID:-1000}"
+    environment:
+      - TZ=Europe/Rome
+      - DOCSGPT_API=http://backend:7091
+      - DOCSGPT_PUBLIC_URL=${DOCSGPT_PUBLIC_URL:-https://docsgpt.ilz.it}
+      - SUMMARY_PROMPT_NAME=${SUMMARY_PROMPT_NAME:-Sintesi nuovo documento}
+      - NOVITA_SOURCE_NAME=${NOVITA_SOURCE_NAME:-Novità fiscali}
+      # Agenti collegati alla sorgente delle novità se viene ricreata; il primo è linkato nelle mail.
+      - AGENT_NAME=${NOTIFIER_AGENT_NAME:-Novità fiscali,Claude - archivio fiscale}
+      - POLL_MINUTES=${NOTIFIER_POLL_MINUTES:-30}
+      - ARCHIVE_EVERY_HOURS=${NOTIFIER_ARCHIVE_EVERY_HOURS:-6}
+      - ARCHIVE_SOURCES=${NOTIFIER_ARCHIVE_SOURCES:-agenzia-entrate,ministero-finanze,agenzia-dogane-monopoli,normativa,giurisprudenza,locazioni}
+      # Il 1° del mese, da quest'ora, ricarica gli enti e svuota le novità. Vuoto = disattivato.
+      - MONTHLY_RELOAD_HOUR=${NOTIFIER_MONTHLY_RELOAD_HOUR-2}
+      - SMTP_HOST=${SMTP_HOST:-mailpit}
+      - SMTP_PORT=${SMTP_PORT:-1025}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      # none | starttls | ssl
+      - SMTP_SECURITY=${SMTP_SECURITY:-none}
+      - MAIL_FROM=${MAIL_FROM:-novita-fiscali@localhost}
+      - MAIL_TO=${MAIL_TO:-studio@localhost}
+    volumes:
+      - ${ARCHIVE_DIR:-/mnt/Multimedia/circolari}:/archive
+      # Script del loader dal repository docsgpt-loader-it (sola lettura).
+      - ./loader:/loader:ro
+      - ./data/notifier:/state
+      - ./data/doc_links:/doc_links
+    depends_on:
+      - backend
+      - mailpit
+    restart: unless-stopped
+
+  redis:
+    image: redis:6-alpine
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=docsgpt
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-docsgpt}
+      - POSTGRES_DB=docsgpt
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docsgpt -d docsgpt"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    profiles: [https]
+    environment:
+      - DOCSGPT_DOMAIN=${DOCSGPT_DOMAIN:-}
+    # The domain is checked here rather than with ${DOCSGPT_DOMAIN:?}: compose
+    # interpolates every service, so a required variable would break the stack
+    # for everyone who does not use this profile.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        if [ -z "$$DOCSGPT_DOMAIN" ]; then
+        echo "caddy: set DOCSGPT_DOMAIN to the public domain" >&2; exit 1;
+        fi;
+        exec caddy reverse-proxy --from "$$DOCSGPT_DOMAIN" --to backend:7091
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  indexes:
+  inputs:
+  vectors:
+  postgres_data:
+  caddy_data:
+  caddy_config:

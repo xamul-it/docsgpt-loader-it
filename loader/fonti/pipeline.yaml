@@ -1,0 +1,32 @@
+# Fonti gestite dalla pipeline /nuova-fonte (nucleo: fonte.py, estrai.py, …).
+# Letto da estrai.py, carica_docsgpt.py e dal notifier. Una voce per fonte:
+#
+#   - id: codice-civile              # cartella <archivio>/<gruppo>/<id>, prefisso delle domande in eval/
+#     gruppo: codici                 # --source di carica_docsgpt.py e ente del notifier (non un nome di downloader.py)
+#     gruppo_catalogo: Codici        # facoltativo: gruppo mostrato da list_sources e usabile in "sources" (default: gruppo)
+#     nome: "Codice civile"          # nome della sorgente su DocsGPT
+#     descrizione: "…"               # una frase sul contenuto: la legge chi sceglie le fonti (list_sources del server MCP)
+#     adattatore: normattiva         # adattatori/<nome>.py
+#     url: "https://…"               # URL della fonte (lo riconosce l'adattatore)
+#     formato: akn-indice            # scelto in fase 3 con misure (misura_formati.py)
+#     link: locale                   # locale | <candidato> | entrambi:<candidato>, scelto in fase 4 (valuta_link.py)
+#     soglia_caratteri: 2400         # oltre, l'unità si divide sui blocchi (chunk DocsGPT: 700 token)
+#     ente: "Normattiva"             # campo authority del manifest
+#     tipo_documento: "codice"       # campo document_type del manifest
+#     provvisorio: true              # finché non è promossa: ignorata da carica_docsgpt e notifier
+#     # … parametri propri dell'adattatore (es. vigenza)
+
+sorgenti:
+  - id: codice-civile
+    gruppo: codici
+    gruppo_catalogo: Codici
+    nome: "Codice civile"
+    descrizione: "Testo vigente del Codice civile (R.D. 262/1942) da Normattiva, un documento per articolo: persone e famiglia, successioni, proprietà, obbligazioni e contratti, lavoro, impresa e società."
+    adattatore: normattiva
+    url: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262"
+    formato: articolo
+    link: locale
+    soglia_caratteri: 2400
+    ente: "Normattiva"
+    tipo_documento: "codice"
+    casi_limite: ["codice-civile-art-2426", "codice-civile-art-3"]   # l'articolo più lungo e uno abrogato

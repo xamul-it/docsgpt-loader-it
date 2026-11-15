@@ -1,0 +1,44 @@
+{
+ "config": {
+  "id": "codice-civile",
+  "gruppo": "codici",
+  "nome": "Codice civile",
+  "adattatore": "normattiva",
+  "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262",
+  "formato": "articolo",
+  "link": "locale",
+  "soglia_caratteri": 2400,
+  "ente": "Normattiva",
+  "tipo_documento": "codice"
+ },
+ "rete": {
+  "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262": "atto.html",
+  "https://www.normattiva.it/atto/caricaArticolo?art.versione=2&art.idGruppo=0&art.flagTipoArticolo=0&art.codiceRedazionale=042U0262&art.idArticolo=1&art.idSottoArticolo=1&art.idSottoArticolo1=10&art.dataPubblicazioneGazzetta=1942-04-04&art.progressivo=0&": "art-atto-art-1.html",
+  "https://www.normattiva.it/atto/caricaArticolo?art.versione=1&art.idGruppo=1&art.flagTipoArticolo=1&art.codiceRedazionale=042U0262&art.idArticolo=1&art.idSottoArticolo=1&art.idSottoArticolo1=10&art.dataPubblicazioneGazzetta=1942-04-04&art.progressivo=0&": "art-disposizioni-sulla-legge-in-generale-art-1.html",
+  "https://www.normattiva.it/atto/caricaArticolo?art.versione=2&art.idGruppo=2&art.flagTipoArticolo=1&art.codiceRedazionale=042U0262&art.idArticolo=17&art.idSottoArticolo=1&art.idSottoArticolo1=10&art.dataPubblicazioneGazzetta=1942-04-04&art.progressivo=0&": "art-disposizioni-sulla-legge-in-generale-art-17.html",
+  "https://www.normattiva.it/atto/caricaArticolo?art.versione=4&art.idGruppo=3&art.flagTipoArticolo=2&art.codiceRedazionale=042U0262&art.idArticolo=1&art.idSottoArticolo=1&art.idSottoArticolo1=10&art.dataPubblicazioneGazzetta=1942-04-04&art.progressivo=0&": "art-codice-civile-art-1.html",
+  "https://www.normattiva.it/atto/caricaArticolo?art.versione=2&art.idGruppo=3&art.flagTipoArticolo=2&art.codiceRedazionale=042U0262&art.idArticolo=3&art.idSottoArticolo=1&art.idSottoArticolo1=10&art.dataPubblicazioneGazzetta=1942-04-04&art.progressivo=0&": "art-codice-civile-art-3.html",
+  "https://www.normattiva.it/atto/caricaArticolo?art.versione=14&art.idGruppo=3&art.flagTipoArticolo=2&art.codiceRedazionale=042U0262&art.idArticolo=5&art.idSottoArticolo=1&art.idSottoArticolo1=10&art.dataPubblicazioneGazzetta=1942-04-04&art.progressivo=0&": "art-codice-civile-art-5.html",
+  "https://www.normattiva.it/atto/caricaArticolo?art.versione=1&art.idGruppo=6&art.flagTipoArticolo=2&art.codiceRedazionale=042U0262&art.idArticolo=42&art.idSottoArticolo=2&art.idSottoArticolo1=10&art.dataPubblicazioneGazzetta=1942-04-04&art.progressivo=0&": "art-codice-civile-art-42-bis.html",
+  "https://www.normattiva.it/atto/caricaArticolo?art.versione=2&art.idGruppo=42&art.flagTipoArticolo=2&art.codiceRedazionale=042U0262&art.idArticolo=314&art.idSottoArticolo=1&art.idSottoArticolo1=30&art.dataPubblicazioneGazzetta=1942-04-04&art.progressivo=0&": "art-codice-civile-art-314-2.html",
+  "https://www.normattiva.it/atto/caricaArticolo?art.versione=1&art.idGruppo=258&art.flagTipoArticolo=2&art.codiceRedazionale=042U0262&art.idArticolo=2043&art.idSottoArticolo=1&art.idSottoArticolo1=10&art.dataPubblicazioneGazzetta=1942-04-04&art.progressivo=0&": "art-codice-civile-art-2043.html",
+  "https://www.normattiva.it/atto/caricaArticolo?art.versione=5&art.idGruppo=311&art.flagTipoArticolo=2&art.codiceRedazionale=042U0262&art.idArticolo=2426&art.idSottoArticolo=1&art.idSottoArticolo1=10&art.dataPubblicazioneGazzetta=1942-04-04&art.progressivo=0&": "art-codice-civile-art-2426.html",
+  "https://www.normattiva.it/atto/caricaArticolo?art.versione=1&art.idGruppo=415&art.flagTipoArticolo=2&art.codiceRedazionale=042U0262&art.idArticolo=2969&art.idSottoArticolo=1&art.idSottoArticolo1=10&art.dataPubblicazioneGazzetta=1942-04-04&art.progressivo=0&": "art-codice-civile-art-2969.html",
+  "https://www.normattiva.it/do/atto/caricaAKN?dataGU=19420404&codiceRedaz=042U0262&dataVigenza=20261111": "atto.akn.xml"
+ },
+ "campione": {
+  "articolo": [
+   "atto-art-1",
+   "disposizioni-sulla-legge-in-generale-art-1",
+   "disposizioni-sulla-legge-in-generale-art-17",
+   "codice-civile-art-1",
+   "codice-civile-art-3",
+   "codice-civile-art-5",
+   "codice-civile-art-42-bis",
+   "codice-civile-art-314-2",
+   "codice-civile-art-2043",
+   "codice-civile-art-2426",
+   "codice-civile-art-2969"
+  ]
+ }
+}

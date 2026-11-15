@@ -1,0 +1,255 @@
+# Domande di prova per la ricerca via MCP (search_docs) — set iniziale.
+#
+# Ogni domanda ha la fonte attesa (percorso relativo a circolari/) e i fatti che
+# la risposta deve contenere, verificati sul testo del documento.
+# Misure:
+#   hit@k     la fonte attesa compare tra i primi k risultati di search_docs
+#   fatto     la risposta finale di Claude contiene il fatto atteso
+#   trappola  Claude non cade nella trappola descritta
+# Le domande sono scritte come le farebbe un utente: spesso senza le parole del titolo.
+
+domande:
+
+# --- Riferimenti esatti e numeri vicini -------------------------------------
+- id: rif-01
+  categoria: riferimento-esatto
+  domanda: "Cosa dice la circolare 21/E del 2016 dell'Agenzia delle Entrate?"
+  attesi: [agenzia-entrate/circolari/files/2016/2016-05-25_Circolare_21_*]
+  fatti: ["reverse charge su console da gioco, tablet PC e laptop", "art. 17, sesto comma, lett. c) DPR 633/1972"]
+  trappola: "Confonderla con la circolare 37/E 2015 (reverse charge edile, lett. a-ter) o con altre circolari n. 21 di anni diversi."
+
+- id: rif-02
+  categoria: numeri-vicini
+  domanda: "Il reverse charge nell'edilizia, lettera a-ter dell'art. 17: quali chiarimenti ha dato l'Agenzia dopo gli incontri con le associazioni di categoria?"
+  attesi: [agenzia-entrate/circolari/files/2015/2015-12-22_Circolare_37_*]
+  fatti: ["circolare 37/E del 22 dicembre 2015", "rinvia alla circolare 14/E del 27 marzo 2015"]
+  trappola: "Rispondere con la 21/E 2016 (lett. c) o solo con la 14/E 2015."
+
+- id: rif-03
+  categoria: codice-tributo
+  domanda: "Con quale codice tributo verso in F24 la sanzione unica da ravvedimento IRPEF col cumulo giuridico?"
+  attesi: [agenzia-entrate/risoluzioni/files/2026/2026-10-23_Risoluzione_38_*]
+  fatti: ["8960", "risoluzione 38 del 23 ottobre 2026", "art. 13, comma 2-bis, d.lgs. 472/1997"]
+  trappola: "Inventare un codice o citare codici delle addizionali (8961 comunale, 8962 regionale) al posto di 8960."
+
+- id: rif-04
+  categoria: codice-tributo
+  domanda: "Ho aderito al concordato preventivo biennale e voglio fare il ravvedimento degli anni pregressi: quali codici uso per l'imposta sostitutiva?"
+  attesi: [agenzia-entrate/risoluzioni/files/2025/2025-12-18_Risoluzione_72_*]
+  fatti: ["4089 (imposte sui redditi, persone fisiche)", "4090", "4091 sezione Regioni (IRAP)", "art. 12-ter DL 84/2025"]
+  trappola: "Fermarsi a un solo codice o confondere le sezioni F24 (Erario e Regioni)."
+
+- id: rif-05
+  categoria: inesistente
+  domanda: "Riassumimi la circolare 45/E del 2024 dell'Agenzia delle Entrate."
+  attesi: []
+  fatti: ["nel 2024 le circolari arrivano al n. 23: la 45/E del 2024 non esiste nell'archivio"]
+  trappola: "Riassumere un documento qualsiasi con numero 45 o anno 2024 come se fosse quello giusto."
+
+- id: rif-06
+  categoria: doppione
+  domanda: "Qual è la circolare con la guida operativa completa sul concordato preventivo biennale del giugno 2025?"
+  attesi: [agenzia-entrate/circolari/files/2025/2025-06-24_Circolare_9_*]
+  fatti: ["circolare 9/E del 24 giugno 2025", "tiene conto del correttivo d.lgs. 81/2025"]
+  trappola: "Citare come 'circolare 39' il comunicato stampa n. 39 dello stesso giorno, archiviato tra le circolari."
+
+# --- Domande parafrasate (senza le parole del titolo) ----------------------
+- id: par-01
+  categoria: parafrasi
+  domanda: "Se affitto casa per pochi giorni tramite Airbnb e il pagamento passa dalla piattaforma, mi trattengono qualcosa?"
+  attesi:
+    - agenzia-entrate/circolari/files/2017/2017-10-12_Circolare_24_*
+    - locazioni/locazioni-nazionale-affitti-brevi/files/dl-24-aprile-2017-n-50-art-4-*
+  fatti: ["ritenuta del 21% operata dall'intermediario che incassa i canoni"]
+  trappola: "Non distinguere tra intermediario che incassa e intermediario che non interviene nel pagamento."
+
+- id: par-02
+  categoria: parafrasi
+  domanda: "Ho guadagnato 1.500 euro vendendo bitcoin quest'anno: devo dichiarare la plusvalenza?"
+  attesi: [agenzia-entrate/circolari/files/2023/2023-10-27_Circolare_30_*]
+  fatti: ["regime della legge di bilancio 2023: soglia (franchigia) di 2.000 euro nel periodo d'imposta", "non rileva la permuta tra cripto-attività con uguali caratteristiche e funzioni"]
+  trappola: "Non segnalare che la soglia vale per il regime della L. 197/2022 e che le norme successive possono averla cambiata."
+
+- id: par-03
+  categoria: parafrasi
+  domanda: "Sono un medico: le mie visite ai pazienti hanno l'IVA?"
+  attesi: [normativa/decreto-del-presidente-della-repubblica/files/1972/1972-10-26_Decreto_del_Presidente_della_Repubblica_633_*]
+  fatti: ["esenti ex art. 10, primo comma, n. 18 DPR 633/1972", "prestazioni sanitarie di diagnosi, cura e riabilitazione"]
+  trappola: "Il DPR 633 è un unico documento di oltre 500.000 caratteri: il pezzo con il n. 18 può non essere recuperato."
+
+# --- Tempo: norme e prassi cambiate ----------------------------------------
+- id: tem-01
+  categoria: versioni-nel-tempo
+  domanda: "Che aliquota di cedolare secca pago oggi sugli affitti brevi se ho due appartamenti?"
+  attesi:
+    - agenzia-entrate/circolari/files/2024/2024-05-10_Circolare_10_*
+  fatti: ["26% in via ordinaria dal 2024", "21% per una sola unità immobiliare scelta dal contribuente"]
+  trappola: "Rispondere 21% per tutti sulla base della circolare 24/E 2017."
+
+- id: tem-02
+  categoria: versioni-nel-tempo
+  domanda: "Come è cambiata la tassazione degli affitti brevi dal 2017 a oggi?"
+  attesi:
+    - agenzia-entrate/circolari/files/2017/2017-10-12_Circolare_24_*
+    - agenzia-entrate/circolari/files/2024/2024-05-10_Circolare_10_*
+  fatti: ["2017: regime art. 4 DL 50/2017, cedolare 21% e ritenuta 21%", "2024: L. 213/2023, 26% con 21% su una sola unità"]
+  trappola: "Usare una sola delle due fonti."
+
+- id: tem-03
+  categoria: versioni-nel-tempo
+  domanda: "Nel patent box attuale l'agevolazione è uno sconto sul reddito o una maggiorazione dei costi? Di quanto?"
+  attesi: [agenzia-entrate/circolari/files/2023/2023-02-24_Circolare_5_*]
+  fatti: ["nuovo patent box art. 6 DL 146/2021: maggiorazione del 110% delle spese"]
+  trappola: "Descrivere il vecchio regime (esclusione di una quota del reddito, circolari 36/E 2015 e 11/E 2016, 28/E 2020)."
+
+- id: tem-04
+  categoria: versioni-nel-tempo
+  domanda: "Vendo una casa su cui ho fatto il Superbonus: pago tasse sulla plusvalenza anche se l'ho comprata 8 anni fa?"
+  attesi: [agenzia-entrate/circolari/files/2024/2024-06-13_Circolare_13_*]
+  fatti: ["art. 67, comma 1, lett. b-bis) TUIR (L. 213/2023)", "interventi conclusi da non più di dieci anni", "esclusi immobili da successione e abitazione principale per la maggior parte del periodo"]
+  trappola: "Applicare la regola dei 5 anni (lett. b) ignorando la nuova lettera b-bis."
+
+# --- Documenti quasi uguali --------------------------------------------------
+- id: sim-01
+  categoria: quasi-duplicati
+  domanda: "Plusvalenza Superbonus quando i lavori li ha pagati un altro comproprietario: cosa ha risposto l'Agenzia?"
+  attesi: [agenzia-entrate/interpelli/files/2026/2026-08-10_Interpello_158_*]
+  fatti: ["risposta n. 158/2026", "artt. 67, comma 1, lett. b-bis) e 68 TUIR"]
+  trappola: "Rispondere con la risposta 124/2026 (stesso tema, caso diverso: data di acquisto dell'immobile)."
+
+- id: sim-02
+  categoria: quasi-duplicati
+  domanda: "Sono in forfettario e ho aderito al concordato: se supero 100.000 euro di ricavi ma resto sotto 150.000 cosa succede?"
+  attesi: [agenzia-entrate/interpelli/files/2026/2026-03-30_Interpello_87_*]
+  fatti: ["causa di cessazione: soglia forfettario maggiorata del 50%", "uscita immediata dal forfettario sopra 100.000 euro", "richiama la circolare 18/E del 17 settembre 2024"]
+  trappola: "Confondere con altri interpelli CPB del 2026 (ce ne sono decine)."
+
+- id: sim-03
+  categoria: quasi-duplicati
+  domanda: "Posso applicare la cedolare secca a un negozio C/1 se il contratto del 2013 è stato prorogato nel 2019?"
+  attesi: [agenzia-entrate/interpelli/files/2026/2026-02-11_Interpello_34_*]
+  fatti: ["risposta n. 34/2026", "regime transitorio art. 1, comma 59, L. 145/2018 (contratti stipulati nel 2019)"]
+  trappola: "Rispondere genericamente sulla cedolare per le abitazioni."
+
+# --- Giurisprudenza (metadato 'authority' vuoto nell'archivio) --------------
+- id: giu-01
+  categoria: giurisprudenza
+  domanda: "Se l'inquilino è una società che usa l'appartamento per un dipendente, il proprietario può avere la cedolare secca? Ci sono sentenze?"
+  attesi:
+    - giurisprudenza/sentenza/files/2024/2024-12-30_Sentenza_710_*
+    - giurisprudenza/sentenza/files/2024/2024-09-09_Sentenza_617_*
+  fatti: ["CGT secondo grado Piemonte n. 710/2024: appello dell'Ufficio respinto, cedolare valida", "CGT secondo grado Liguria n. 617/2024: appello del contribuente accolto"]
+  trappola: "Attribuirle alla Cassazione: sono sentenze di merito, e l'archivio non indica il giudice nei metadati."
+
+- id: giu-02
+  categoria: giurisprudenza
+  domanda: "C'è giurisprudenza penale tributaria su chi non dichiara le plusvalenze in criptovalute?"
+  attesi: [giurisprudenza/sentenza/files/2026/2026-06-05_Sentenza_20740_*]
+  fatti: ["sentenza n. 20740 del 5 giugno 2026"]
+  trappola: "Citare invece il sequestro di bitcoin (sentenza 1760/2025), che è un altro tema."
+
+# --- Fonti curate sulle locazioni -------------------------------------------
+- id: loc-01
+  categoria: locazioni-curate
+  domanda: "Quanto si paga di imposta di soggiorno a Bologna nel 2026 per un affitto breve prenotato tramite piattaforma?"
+  attesi: [locazioni/comune-bologna/files/dg-pro-2025-283-approvazione-delle-tariffe-2026-per-l-imposta-di-soggiorno.pdf]
+  fatti: ["10,50% del costo dell'appartamento al netto di IVA", "massimo 7 euro a persona per notte", "delibera DG/PRO/2025/283"]
+  trappola: "Usare le tariffe 2025 (comunicato del 2024) o il regolamento del 2015."
+
+- id: loc-02
+  categoria: locazioni-curate
+  domanda: "Che sanzione rischio se pubblico un annuncio di casa vacanze senza CIN?"
+  attesi: [locazioni/locazioni-nazionale-affitti-brevi/files/dl-18-ottobre-2023-n-145-art-13-ter-*]
+  fatti: ["immobile privo di CIN: da 800 a 8.000 euro", "mancata esposizione o indicazione del CIN: da 500 a 5.000 euro più rimozione dell'annuncio"]
+  trappola: "Invertire le due sanzioni o citare solo la seconda."
+
+- id: loc-03
+  categoria: locazioni-curate
+  domanda: "In Emilia-Romagna il CIR regionale è ancora necessario ora che c'è il CIN nazionale?"
+  attesi: [locazioni/regione-emilia-romagna/files/circolare-in-materia-di-cin-e-cir-prot-951915.pdf]
+  fatti: ["circolare della Regione Emilia-Romagna prot. 0951915 del 5/9/2024", "dal 2 novembre 2024 il CIN sostituisce il CIR negli annunci e nella promozione", "resta obbligatoria l'iscrizione a Ross 1000: il CIR diventa codice di interscambio tra banca dati regionale e BDSR", "si applicano solo le sanzioni nazionali dell'art. 13-ter del DL 145/2023"]
+  trappola: "Rispondere che il CIR non serve più del tutto (l'iscrizione a Ross 1000 resta il presupposto per il CIN), o che vanno indicati entrambi i codici negli annunci."
+
+# --- Filtri (oggi non esprimibili in search_docs) ---------------------------
+- id: fil-01
+  categoria: filtri
+  domanda: "Elencami gli interpelli del 2026 sul concordato preventivo biennale che riguardano le associazioni professionali."
+  attesi:
+    - agenzia-entrate/interpelli/files/2026/2026-04-02_Interpello_100_*
+    - agenzia-entrate/interpelli/files/2026/2026-02-24_Interpello_48_*
+  fatti: ["almeno le risposte 100/2026 e 48/2026"]
+  trappola: "Includere circolari o interpelli di anni precedenti; con max_documents=10 l'elenco può essere incompleto."
+
+- id: fil-02
+  categoria: filtri
+  domanda: "Cerca solo nei comunicati: delibere approvate della cassa forense nel 2015."
+  # Passato a search_docs come lo passerebbe Claude; i risultati fuori da queste fonti contano come errore.
+  sources: ["Normativa - Comunicati"]
+  attesi: [normativa/comunicato/files/2015/2015-*_Approvazione_della_delibera_*forense*]
+  fatti: ["comunicato del Ministero del Lavoro sull'approvazione di una delibera del Comitato dei delegati della Cassa nazionale di previdenza ed assistenza forense (22 agosto o 17 settembre 2015)"]
+  trappola: "Rispondere con documenti fuori dai comunicati (decreti, giurisprudenza, prassi) o con delibere di altre casse."
+
+# --- Codice civile (fonte codici/codice-civile) -----------------------------
+- id: codice-civile-01
+  categoria: riferimento-esatto
+  domanda: "Cosa dice l'art. 2043 del codice civile?"
+  attesi: [codici/codice-civile/files/codice-civile-art-2043.html]
+  keywords: '"2043" "fatto illecito"'
+  fatti: ["fatto doloso o colposo che cagiona ad altri un danno ingiusto", "obbliga a risarcire il danno"]
+  trappola: "Confondere con 2049 (padroni e committenti) o 2050 (attività pericolose)."
+
+- id: codice-civile-02
+  categoria: parafrasi
+  domanda: "Un contratto contrario a norme imperative è valido? Quando un contratto è nullo?"
+  attesi: [codici/codice-civile/files/codice-civile-art-1418.html]
+  keywords: '"nullo" "norme imperative" "illiceità della causa"'
+  fatti: ["il contratto è nullo quando è contrario a norme imperative, salvo che la legge disponga diversamente", "nullità per mancanza dei requisiti dell'art. 1325, illiceità della causa, dei motivi (art. 1345), mancanza dei requisiti dell'oggetto (art. 1346)"]
+  trappola: "Citare l'annullabilità (art. 1425 ss.) invece della nullità."
+
+- id: codice-civile-03
+  categoria: numeri-vicini
+  domanda: "Se uno svolge un'attività pericolosa e causa un danno, come può evitare di risarcire? Art. 2050 c.c."
+  attesi: [codici/codice-civile/files/codice-civile-art-2050.html]
+  keywords: '"2050" "attività pericolosa" "misure idonee"'
+  fatti: ["attività pericolosa per sua natura o per la natura dei mezzi adoperati", "risarcimento dovuto se non prova di aver adottato tutte le misure idonee a evitare il danno"]
+  trappola: "Rispondere con il 2043 (colpa generica) o il 2051 (cose in custodia), vicini per numero e materia."
+
+- id: codice-civile-04
+  categoria: titolo-senza-numero
+  domanda: "Cosa prevede il codice civile sull'onere della prova?"
+  attesi: [codici/codice-civile/files/codice-civile-art-2697.html]
+  keywords: '"onere della prova" "fatti che ne costituiscono il fondamento"'
+  fatti: ["chi vuol far valere un diritto in giudizio deve provare i fatti che ne costituiscono il fondamento", "chi eccepisce l'inefficacia di tali fatti o la modifica/estinzione del diritto deve provare i fatti su cui l'eccezione si fonda"]
+  trappola: "Rispondere con norme del codice di procedura civile."
+
+- id: codice-civile-05
+  categoria: articolo-bis
+  domanda: "Un'associazione riconosciuta può trasformarsi o fondersi con un'altra? Art. 42-bis c.c."
+  attesi: [codici/codice-civile/files/codice-civile-art-42-bis.html]
+  keywords: '"42-bis" "trasformazione" "fusione" "scissione"'
+  fatti: ["associazioni riconosciute e non riconosciute e fondazioni possono operare reciproche trasformazioni, fusioni o scissioni", "salvo che sia espressamente escluso dall'atto costitutivo o dallo statuto", "la trasformazione produce gli effetti di cui all'articolo 2498"]
+  trappola: "Fermarsi all'art. 42 o confondere con la trasformazione delle società (2498 ss.)."
+
+- id: codice-civile-06
+  categoria: disposizioni-preliminari
+  domanda: "Come va interpretata la legge secondo le preleggi? Cosa si fa se un caso non è previsto da nessuna norma?"
+  attesi: [codici/codice-civile/files/disposizioni-sulla-legge-in-generale-art-12.html]
+  keywords: '"interpretazione della legge" "significato proprio delle parole" "intenzione del legislatore"'
+  fatti: ["alla legge non si può attribuire altro senso che quello fatto palese dal significato proprio delle parole secondo la connessione di esse e dall'intenzione del legislatore", "in caso di lacuna si ricorre ai casi simili o materie analoghe (analogia)", "se il caso resta dubbio si decide secondo i principi generali dell'ordinamento giuridico dello Stato"]
+  trappola: "Citare l'art. 1362 c.c. (interpretazione del contratto) o l'art. 14 delle preleggi (applicazione delle leggi penali ed eccezionali)."
+
+- id: codice-civile-07
+  categoria: articolo-lungo-diviso
+  domanda: "Quando i condomini sono più di otto e l'assemblea non nomina l'amministratore, chi lo nomina?"
+  attesi: [codici/codice-civile/files/codice-civile-art-1129-p1.html]
+  keywords: '"amministratore" "più di otto" "autorità giudiziaria"'
+  fatti: ["quando i condomini sono più di otto e l'assemblea non provvede, la nomina è fatta dall'autorità giudiziaria", "su ricorso di uno o più condomini o dell'amministratore dimissionario"]
+  trappola: "Rispondere con il solo art. 1130 (attribuzioni) o con la parte 2/3 dell'art. 1129 (revoca, compenso)."
+
+- id: codice-civile-08
+  categoria: articolo-abrogato
+  domanda: "Cosa stabiliva l'art. 314/2 del codice civile?"
+  attesi: [codici/codice-civile/files/codice-civile-art-314-2.html]
+  keywords: '"314/2" abrogato'
+  fatti: ["articolo abrogato dalla l. 4 maggio 1983, n. 184"]
+  trappola: "Inventare un contenuto: la pagina riporta solo l'abrogazione; la risposta corretta è che è abrogato (adozione di maggiori di età, legge 184/1983)."

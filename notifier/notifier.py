@@ -62,6 +62,27 @@ RSS_SOURCE = "agenzia-entrate/sito-agenzia"
 # per amministrazione; il downloader ne riconfronta sempre lo sha256.
 ENTI = ["agenzia-entrate", "ministero-finanze", "agenzia-dogane-monopoli", "normativa", "giurisprudenza", "locazioni"]
 
+
+def pipeline_gruppi(path: Path) -> list[str]:
+    """Gruppi delle fonti della pipeline /nuova-fonte (loader/fonti/pipeline.yaml):
+    si aggiornano con estrai.py invece che con downloader.py."""
+    try:
+        import yaml
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return []
+    # Escluse le fonti provvisorie (in prova o respinte) e i nomi già usati da downloader.py.
+    return list(dict.fromkeys(s["gruppo"] for s in data.get("sorgenti") or []
+                              if s.get("gruppo") and not s.get("provvisorio") and s["gruppo"] not in ENTI))
+
+
+PIPELINE_GRUPPI = pipeline_gruppi(Path(os.environ.get("LOADER_DIR", "/loader")) / "fonti" / "pipeline.yaml")
+ENTI += [g for g in PIPELINE_GRUPPI if g not in ENTI]
+
+
+def con_pipeline(enti: list[str]) -> list[str]:
+    return enti + [g for g in PIPELINE_GRUPPI if g not in enti] if enti else []
+
 # Stessa configurazione delle sorgenti caricate con carica_docsgpt.py.
 SOURCE_CONFIG = {
     "chunking": {"strategy": "classic_chunk", "max_tokens": 700, "min_tokens": 150},
@@ -87,7 +108,9 @@ class Config:
         "https://www.agenziaentrate.gov.it/portale/c/portal/rss/entrate?idrss=0753fcb1-1a42-4f8c-f40d-02793c6aefb4",
     )
     # Enti da rileggere con downloader.py, e ogni quante ore. Vuoto = solo feed RSS.
-    archive_sources = [s for s in env("ARCHIVE_SOURCES", ",".join(ENTI)).split(",") if s.strip()]
+    # Le fonti della pipeline entrano da sole (ARCHIVE_SOURCES nel compose è una lista fissa);
+    # si escludono togliendole da loader/fonti/pipeline.yaml. Vuoto resta vuoto.
+    archive_sources = con_pipeline([s for s in env("ARCHIVE_SOURCES", ",".join(ENTI)).split(",") if s.strip()])
     archive_every_hours = float(env("ARCHIVE_EVERY_HOURS", "6"))
     # Ricaricamento mensile: il primo del mese, da quest'ora, gli enti vengono
     # ricaricati per intero e le loro novità tolte dalla sorgente delle novità.
@@ -490,6 +513,12 @@ def loader_script(name: str) -> str:
 
 
 def run_downloader(ente: str) -> None:
+    if ente in PIPELINE_GRUPPI:
+        cmd = [sys.executable, loader_script("estrai.py"), "--target", str(Config.archive_dir), "--gruppo", ente]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=6 * 3600)
+        if proc.returncode != 0:
+            raise RuntimeError(f"estrai exit {proc.returncode}: {(proc.stderr or proc.stdout)[-400:]}")
+        return
     cmd = [
         sys.executable, loader_script("downloader.py"),
         "--target", str(Config.archive_dir), "--source", ente,

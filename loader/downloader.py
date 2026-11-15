@@ -64,6 +64,8 @@ import xml.etree.ElementTree as ET
 import requests
 from bs4 import BeautifulSoup
 
+import misura_testo_utile
+
 UA = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36 "
@@ -260,6 +262,9 @@ SOURCES = {
 CURATED_YAML = Path(__file__).resolve().parent / "fonti" / "locazioni.yaml"
 # Sotto questa soglia di caratteri una pagina html non e un documento.
 CURATED_MIN_TEXT = 200
+# Campi facoltativi di una voce (issue #3): solo_link: "si" = la pagina resta nell'elenco
+# ma non si scarica (login, indici); documento: <url> = si scarica il file collegato
+# (PDF, testo integrale) al posto della scheda in url, che resta la chiave della voce.
 CURATED_REQUIRED = ("titolo", "ente", "tipo", "url", "verificato")
 
 
@@ -269,6 +274,17 @@ def curated_slug(title: str, max_len: int = 120) -> str:
     s = "".join(c for c in s if not unicodedata.combining(c))
     s = re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
     return s[:max_len].strip("-") or "documento"
+
+
+def curated_solo_link(voce: dict) -> bool:
+    return str(voce.get("solo_link", "")).strip().lower() == "si"
+
+
+def curated_sospetto(path: Path) -> bool:
+    """True se il file già scaricato è una pagina html sospetta (vedi misura_testo_utile)."""
+    if path.suffix != ".html":
+        return False
+    return bool(misura_testo_utile.sospetti(misura_testo_utile.misura(path.read_bytes())))
 
 
 def curated_sources(path: Path = CURATED_YAML) -> dict[str, dict]:
@@ -284,6 +300,8 @@ def curated_sources(path: Path = CURATED_YAML) -> dict[str, dict]:
             missing = [k for k in CURATED_REQUIRED if not voce.get(k)]
             if missing:
                 raise ValueError(f"{path.name}, {src.get('id')}: voce {voce.get('titolo')!r} senza {', '.join(missing)}")
+            if curated_solo_link(voce) and voce.get("documento"):
+                raise ValueError(f"{path.name}, {src.get('id')}: voce {voce['titolo']!r} con solo_link e documento insieme")
             slug = curated_slug(voce["titolo"])
             if slug in slugs:
                 raise ValueError(f"{path.name}, {src.get('id')}: due voci con lo stesso slug {slug!r}")
@@ -388,10 +406,22 @@ def circolare_number(text: str) -> str:
     return re.sub(r"\s+", "", m.group(1)) if m else ""
 
 
+# Raccolte in cui il giudice o l'organo emanante fa parte del nome del file:
+# DocsGPT non legge il manifest e mostra il nome del file come titolo (issue #2).
+AUTHORITY_IN_FILENAME = ("giurisprudenza", "normativa")
+
+# Nomi di file entro i 255 byte del filesystem: il titolo si accorcia se il
+# prefisso è lungo.
+MAX_NAME_BEFORE_TITLE = 200
+
+
 def file_prefix(doc: "Doc") -> str:
-    """Prefisso "data_tipo_numero_": rende il file riconoscibile senza manifest."""
+    """Prefisso "data_tipo_numero_[organo_]": rende il file riconoscibile senza manifest."""
     parts = [doc.document_date, doc.document_type if doc.number else "", doc.number]
-    return "".join(ascii_slug(x, 40) + "_" for x in parts if x)
+    prefix = "".join(ascii_slug(x, 40) + "_" for x in parts if x)
+    if doc.authority and doc.source.split("/")[0] in AUTHORITY_IN_FILENAME:
+        prefix += ascii_slug(doc.authority, 80) + "_"
+    return prefix
 
 
 def sha256_file(path: Path) -> str:
@@ -711,7 +741,7 @@ class Store:
         folder = self.files / year
         folder.mkdir(parents=True, exist_ok=True)
 
-        base = ascii_slug(title, 120)
+        base = ascii_slug(title, max(30, min(120, MAX_NAME_BEFORE_TITLE - len(prefix))))
         digest = hashlib.sha1(url.encode("utf-8")).hexdigest()[:10]
         return folder / f"{prefix}{base}__{digest}{ext}"
 
@@ -760,7 +790,8 @@ class SplitStore:
 def relocate_existing(store: Store, doc: Doc, old: dict, out: Path) -> None:
     """Documento già scaricato: allinea nome file e metadati senza riscaricarlo."""
     old_path = store.root / old["local_file"]
-    if out == old_path and old.get("title") == doc.title and old.get("number", "") == doc.number:
+    if (out == old_path and old.get("title") == doc.title and old.get("number", "") == doc.number
+            and old.get("authority", "") == doc.authority):
         return None
     if out != old_path:
         os.replace(old_path, out)
@@ -1365,6 +1396,30 @@ def _authority_from_estremi(text: str) -> str:
     return norm_text(m.group(1)) if m else ""
 
 
+# Titoli che CeRDEF mette al posto di un'intitolazione mancante.
+PLACEHOLDER_TITLES = {"nessuna intitolazione presente", "non disponibile"}
+
+
+def real_title(s: str) -> str:
+    """Titolo in testo semplice, vuoto se è solo un segnaposto."""
+    t = clean_title(s)
+    return "" if t.lower() in PLACEHOLDER_TITLES else t
+
+
+def organ_from_estremi(text: str) -> str:
+    """Giudice o organo emanante dagli estremi di giurisprudenza e normativa.
+
+    "Sentenza del 09/11/2021 n. 5009 - Comm. Trib. Reg. per il Lazio Sezione/Collegio 10"
+    -> "Comm. Trib. Reg. per il Lazio". La sezione si toglie; "Legge del ... n. 821 -"
+    non indica l'organo e dà "".
+    """
+    m = re.search(r"\bdel\s+\d{1,2}/\d{1,2}/\d{4}(?:\s+n\.\s*\S+)?\s*-(.*)$", norm_text(text))
+    if not m:
+        return ""
+    organ = re.sub(r"\s*-?\s*Sezione/Collegio\b.*$", "", m.group(1))
+    return norm_text(organ).strip(" -")
+
+
 def _doctype_from_estremi(text: str, default: str) -> str:
     # Il tipo è tutto ciò che precede la data: "Decreto del Presidente della
     # Repubblica del 26/10/1972 n. 633", "Decreto-legge del ...".
@@ -1406,7 +1461,7 @@ def _parse_prassi_multiparte(http: Http, source_name: str, detail_url: str, html
         title=title,
         document_date=guess_date(estremi),
         authority=_authority_from_estremi(estremi),
-        document_type=_doctype_from_estremi(estremi, "Prassi"),
+        document_type=_doctype_from_estremi(estremi, ""),
         number=number_from_estremi(estremi),
         detail_url=detail_url,
         download_url=detail_url,
@@ -1461,7 +1516,7 @@ def _parse_prassi_detail(http: Http, source_name: str, detail_url: str, html: st
         title=title,
         document_date=guess_date(estremi),
         authority=_authority_from_estremi(estremi),
-        document_type=_doctype_from_estremi(estremi, "Prassi"),
+        document_type=_doctype_from_estremi(estremi, ""),
         number=number_from_estremi(estremi),
         detail_url=detail_url,
         download_url=detail_url,
@@ -1493,13 +1548,17 @@ def _parse_giurisprudenza_detail(source_name: str, detail_url: str, html: str):
     estremi = norm_text(prov.findtext("estremi") or "")
     intitolazione = clean_title(prov.findtext(".//intitolazione") or "")
     massima = ((prov.findtext(".//massima") or "")).strip()
-    title = intitolazione or clean_title(massima) or estremi or detail_url
+    if intitolazione.lower() in PLACEHOLDER_TITLES:
+        # Titolo di ripiego: tipo, data, numero e giudice (come ripara_metadati.py).
+        title = estremi or real_title(massima) or detail_url
+    else:
+        title = intitolazione or real_title(massima) or estremi or detail_url
 
     doc = Doc(
         source=source_name,
         title=title,
         document_date=guess_date(estremi),
-        authority=_authority_from_estremi(estremi),
+        authority=organ_from_estremi(estremi),
         document_type=_doctype_from_estremi(estremi, "Giurisprudenza"),
         number=number_from_estremi(estremi),
         detail_url=detail_url,
@@ -1582,7 +1641,8 @@ def _parse_normativa_detail(http: Http, source_name: str, detail_url: str, html:
         source=source_name,
         title=title,
         document_date=guess_date(estremi),
-        authority="",
+        authority=organ_from_estremi(estremi) or norm_text("; ".join(
+            norm_text(e.text) for e in root.iterfind("intestazione/enti/ente") if norm_text(e.text))),
         document_type=_doctype_from_estremi(estremi, ""),
         number=number_from_estremi(estremi),
         detail_url=detail_url,
@@ -1616,10 +1676,17 @@ def matches_authority(doc: Doc, cfg: dict) -> bool:
 
 
 def matches_document_type(doc: Doc, cfg: dict) -> bool:
+    """Il tipo dichiarato da CeRDEF deve coincidere con quello della source.
+
+    Il titolo si guarda solo se il tipo manca: i comunicati stampa titolati
+    "In una circolare..." finivano tra le circolari (issue #1).
+    """
     wanted = cfg.get("document_type")
     if not wanted:
         return True
-    return wanted.lower() in (doc.title + " " + doc.document_type).lower()
+    if norm_text(doc.document_type):
+        return norm_text(doc.document_type).lower() == wanted.lower()
+    return wanted.lower() in doc.title.lower()
 
 
 def walk_cedef_results(
@@ -1871,31 +1938,62 @@ def curated_source(http: Http, store: Store, source_name: str, cfg: dict, mode: 
     sha cambia il file è sovrascritto, il manifest aggiornato e la cosa
     annotata in errors.log come "aggiornato". Le voci non verificate sono
     saltate e annotate allo stesso modo.
-    """
-    stats = {"downloaded": 0, "updated": 0, "unchanged": 0, "skipped_unverified": 0, "errors": 0}
-    voci = []
-    for voce in cfg["voci"]:
-        if str(voce.get("verificato", "")).strip().lower() == "si":
-            voci.append(voce)
-        else:
-            stats["skipped_unverified"] += 1
-            store.error(f"{voce['titolo']} <{voce['url']}>: non verificata, saltata")
 
-    def fetch(voce: dict) -> str:
+    Le voci "solo_link" non si scaricano; per loro e per le non verificate al
+    refresh si tolgono file e riga già presenti; con "documento" si scarica quell'URL al posto di url. Le
+    pagine html con poco testo utile, un campo password o a frame si scaricano
+    ma sono segnalate in errors.log come "pagina sospetta"; al refresh una
+    versione sospetta non sostituisce una precedente che non lo era.
+    """
+    stats = {"downloaded": 0, "updated": 0, "unchanged": 0, "skipped_unverified": 0, "solo_link": 0,
+             "sospette": 0, "tenute_precedenti": 0, "errors": 0}
+    voci = []
+    def togli_gia_scaricata(voce: dict) -> None:
+        old = store.existing.pop(voce["url"], None)
+        if old and old.get("local_file"):
+            (store.root / old["local_file"]).unlink(missing_ok=True)
+
+    for voce in cfg["voci"]:
+        if str(voce.get("verificato", "")).strip().lower() != "si":
+            stats["skipped_unverified"] += 1
+            togli_gia_scaricata(voce)
+            store.error(f"{voce['titolo']} <{voce['url']}>: non verificata, saltata")
+        elif curated_solo_link(voce):
+            stats["solo_link"] += 1
+            togli_gia_scaricata(voce)
+            store.error(f"{voce['titolo']} <{voce['url']}>: solo link, non scaricata")
+        else:
+            voci.append(voce)
+
+    def fetch(voce: dict) -> tuple[str, bool]:
         url = voce["url"]
+        doc_url = voce.get("documento") or url
+        sospetta = False
         try:
-            content = http.get(url).content
+            content = http.get(doc_url).content
             if not content:
                 raise RuntimeError("risposta vuota")
             ext = ".pdf" if content.lstrip().startswith(b"%PDF-") else ".html"
             if ext == ".html" and len(norm_text(BeautifulSoup(content, "html.parser").get_text(" "))) < CURATED_MIN_TEXT:
                 # Moduli di reindirizzamento, pagine che vivono di JavaScript: niente da indicizzare.
                 raise RuntimeError("pagina senza testo (reindirizzamento o contenuto caricato da JavaScript)")
+            if ext == ".html":
+                motivi = misura_testo_utile.sospetti(misura_testo_utile.misura(content))
+                if motivi:
+                    sospetta = True
+                    store.error(f"{voce['titolo']} <{doc_url}>: pagina sospetta: {'; '.join(motivi)}"
+                                " (valutare solo_link o documento nell'elenco curato)")
+                    print(f"  ? pagina sospetta: {voce['titolo']}: {'; '.join(motivi)}")
             sha = hashlib.sha256(content).hexdigest()
             old = store.existing.get(url)
             have_old = mode == "refresh" and store.has_file(old)
             if have_old and old.get("sha256") == sha:
-                return "unchanged"
+                return "unchanged", sospetta
+            if have_old and sospetta and not curated_sospetto(store.root / old["local_file"]):
+                # Pagina di blocco (captcha, accesso negato) al posto di un documento buono.
+                store.error(f"{voce['titolo']} <{doc_url}>: nuova versione sospetta, tenuta la versione precedente")
+                print(f"  = tenuta la versione precedente: {voce['titolo']}")
+                return "tenute_precedenti", sospetta
             out = store.files / f"{curated_slug(voce['titolo'])}{ext}"
             write_atomic(out, content)
             if have_old and store.root / old["local_file"] != out:
@@ -1907,7 +2005,7 @@ def curated_source(http: Http, store: Store, source_name: str, cfg: dict, mode: 
                 authority=voce["ente"],
                 document_type=voce["tipo"],
                 detail_url=url,
-                download_url=url,
+                download_url=doc_url,
                 local_file=str(out.relative_to(store.root)),
                 sha256=sha,
                 downloaded_at=now_iso(),
@@ -1918,18 +2016,20 @@ def curated_source(http: Http, store: Store, source_name: str, cfg: dict, mode: 
             if have_old:
                 store.error(f"{voce['titolo']} <{url}>: aggiornato")
                 print(f"  ~ aggiornato: {out.name}")
-                return "updated"
+                return "updated", sospetta
             print(f"  + {voce['titolo']} -> files/{out.name}")
-            return "downloaded"
+            return "downloaded", sospetta
         except Exception as e:
-            store.error(f"{voce['titolo']} <{url}>: {e}")
+            store.error(f"{voce['titolo']} <{doc_url}>: {e}")
             print(f"  ! {voce['titolo']}: {e}")
-            return "errors"
+            return "errors", sospetta
 
-    for outcome in http.map(fetch, voci):
+    for outcome, sospetta in http.map(fetch, voci):
         stats[outcome] += 1
+        stats["sospette"] += sospetta
     print(f"  {stats['downloaded']} scaricati, {stats['updated']} aggiornati, {stats['unchanged']} invariati, "
-          f"{stats['skipped_unverified']} non verificati saltati, {stats['errors']} errori")
+          f"{stats['skipped_unverified']} non verificati saltati, {stats['solo_link']} solo link, "
+          f"{stats['sospette']} sospette, {stats['tenute_precedenti']} tenute le precedenti, {stats['errors']} errori")
     return stats
 
 

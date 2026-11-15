@@ -1,0 +1,55 @@
+# Catalogo delle fonti fiscali (scaricate da downloader.py, caricate da
+# carica_docsgpt.py). Lo legge il server MCP (list_sources, filtro "sources" e
+# pesi di search_docs): nome della sorgente su DocsGPT, gruppo e descrizione.
+# Il gruppo vale per tutte.
+#
+# Campi facoltativi:
+#   peso       moltiplica il punteggio dei risultati della sorgente in
+#              search_docs (default 1); serve a far scendere le fonti poco
+#              utili senza nasconderle.
+#   cartella   cartella dell'archivio divisa in più sorgenti (issue #7: una
+#              sorgente unica da 64.000 documenti manda il worker in OOM).
+#   tipologie  le sottocartelle di `cartella` che vanno in questa sorgente;
+#   resto      true: tutte le sottocartelle non assegnate ad altre sorgenti
+#              della stessa cartella (comprese quelle che compariranno).
+# Le sorgenti divise si chiamano "<Prefisso> - <parte>": in "sources" il
+# prefisso ("Normativa") seleziona tutte le parti.
+
+gruppo: "Fisco"
+
+sorgenti:
+  - nome: "Agenzia Entrate"
+    descrizione: "Prassi dell'Agenzia delle Entrate: circolari, risoluzioni, risposte a interpello, lettere circolari, comunicati stampa e novità dal sito dell'Agenzia."
+  - nome: "Ministero Finanze"
+    descrizione: "Prassi del Ministero dell'Economia e delle Finanze (archivio CeDEF): circolari, risoluzioni, note, direttive, delibere, telegrammi e comunicati stampa."
+  - nome: "Agenzia Dogane e Monopoli"
+    descrizione: "Prassi dell'Agenzia delle Dogane e dei Monopoli: circolari, lettere circolari, note e risoluzioni (accise, dogane, giochi, tabacchi)."
+  - nome: "Normativa - Leggi e decreti legislativi"
+    descrizione: "Normativa di interesse tributario dall'archivio CeDEF, atti primari: leggi, decreti-legge, decreti legislativi, DPR (tra cui TUIR, DPR 600 e 633), testi unici, codici e leggi costituzionali."
+    cartella: normativa
+    tipologie: [legge, legge-costituzionale, decreto-legge, decreto-legislativo, decreto-del-presidente-della-repubblica,
+                testo-unico, codice, codice-procedura-penale, codice-del-processo-amministrativo]
+  - nome: "Normativa - Decreti"
+    descrizione: "Normativa di interesse tributario dall'archivio CeDEF: decreti ministeriali (MEF e altri ministeri), tra cui decreti attuativi, tassi, scadenze e modelli."
+    cartella: normativa
+    tipologie: [decreto]
+  - nome: "Normativa - Atti UE"
+    descrizione: "Normativa di interesse tributario dall'archivio CeDEF, atti dell'Unione e della Comunità europea: regolamenti, direttive, decisioni, raccomandazioni e indirizzi."
+    cartella: normativa
+    tipologie: [regolamento-comunita-europea, regolamento-unione-europea, decisione-unione-europea, decisione-comunita-europea,
+                direttiva-comunita-europea, direttiva-unione-europea, risoluzione-unione-europea, indirizzo-unione-europea,
+                indirizzo-comunita-europea, raccomandazione-unione-europea, raccomandazione-comunita-europea]
+  - nome: "Normativa - Comunicati"
+    descrizione: "Comunicati pubblicati in Gazzetta Ufficiale dall'archivio CeDEF: in gran parte cambi valuta giornalieri del MEF, conto del Tesoro, approvazione di delibere delle casse previdenziali, avvisi di Comuni e Banca d'Italia."
+    cartella: normativa
+    tipologie: [comunicato]
+    # Un quinto della normativa, quasi mai la risposta a una domanda fiscale.
+    peso: 0.5
+  - nome: "Normativa - Altri atti"
+    descrizione: "Normativa di interesse tributario dall'archivio CeDEF, gli altri atti: provvedimenti, decreti interministeriali e del Presidente del Consiglio, deliberazioni, ordinanze, determinazioni, leggi regionali e provinciali, convenzioni e accordi internazionali."
+    cartella: normativa
+    resto: true
+  - nome: "Giurisprudenza"
+    descrizione: "Giurisprudenza tributaria dall'archivio CeDEF: sentenze, ordinanze e decisioni di Cassazione, Corte costituzionale e giudici tributari di merito."
+  - nome: "Novità fiscali"
+    descrizione: "Documenti fiscali pubblicati nel mese in corso e non ancora confluiti nelle fonti principali: le novità più recenti."

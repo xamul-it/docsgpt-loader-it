@@ -17,6 +17,35 @@ from unittest import mock
 import downloader as d
 
 
+class MatchesDocumentTypeTest(unittest.TestCase):
+    CFG = {"document_type": "Circolare"}
+
+    def doc(self, title, tipo):
+        return d.Doc(source="agenzia-entrate/circolari", title=title, document_type=tipo)
+
+    def test_comunicato_che_cita_una_circolare_e_scartato(self):
+        # Comunicato stampa n. 39 del 24/6/2025 (issue #1).
+        doc = self.doc("Pronta la guida operativa sul concordato preventivo biennale. "
+                       "In una circolare tutte le indicazioni", "Comunicato Stampa")
+        self.assertFalse(d.matches_document_type(doc, self.CFG))
+
+    def test_lettera_circolare_non_e_una_circolare(self):
+        self.assertFalse(d.matches_document_type(self.doc("Oggetto", "Lettera circolare"), self.CFG))
+
+    def test_circolare_accettata_anche_se_il_titolo_non_lo_dice(self):
+        self.assertTrue(d.matches_document_type(self.doc("Concordato preventivo biennale", "Circolare"), self.CFG))
+
+    def test_tipo_confrontato_senza_maiuscole_e_spazi(self):
+        self.assertTrue(d.matches_document_type(self.doc("x", " circolare "), self.CFG))
+
+    def test_senza_tipo_si_guarda_il_titolo(self):
+        self.assertTrue(d.matches_document_type(self.doc("Circolare n. 9/E", ""), self.CFG))
+        self.assertFalse(d.matches_document_type(self.doc("Risoluzione n. 3/E", ""), self.CFG))
+
+    def test_source_senza_tipo_accetta_tutto(self):
+        self.assertTrue(d.matches_document_type(self.doc("x", "Comunicato Stampa"), {}))
+
+
 class HostLimiterTest(unittest.TestCase):
     def test_piu_thread_non_superano_il_ritmo(self):
         lim = d.HostLimiter(50)
@@ -248,6 +277,108 @@ class SplitStoreTest(unittest.TestCase):
                 self.assertTrue(rows[0]["local_file"].startswith("files/2024/"))
 
 
+def giurisprudenza_html(estremi, intitolazione, massima="<p>Massima.</p>", allegato="false"):
+    xml = (
+        f'<risultatiRicerca><risultati><Provvedimento idProvvedimento="{{G1}}" allegato="{allegato}">'
+        f'<estremi link="false">{estremi}</estremi><titoliProvvedimento><titoloProvvedimento>'
+        f'<intitolazione><![CDATA[{intitolazione}]]></intitolazione><massima><![CDATA[{massima}]]></massima>'
+        '</titoloProvvedimento></titoliProvvedimento></Provvedimento></risultati></risultatiRicerca>'
+    )
+    return "<script>var xmlDettaglio = '" + xml.replace("'", "\\'") + "';</script>"
+
+
+def normativa_html(estremi, ente=""):
+    xml = (
+        "<documento><id>{N1}</id><intestazione>"
+        f"<estremiAtto>{estremi}</estremiAtto><titoloAtto>Titolo atto</titoloAtto>"
+        f"<enti><ente>{ente}</ente></enti><gazzettaUfficiale>GU</gazzettaUfficiale>"
+        "</intestazione><sommario/></documento>"
+    )
+    return "<script>var xmlSommario = '" + xml + "';</script>"
+
+
+class AuthorityTest(unittest.TestCase):
+    """Giudice e organo emanante dagli estremi CeRDEF (issue #2)."""
+
+    def test_organo_dagli_estremi(self):
+        casi = {
+            "Sentenza del 07/09/2022 n. 26348 - Corte di Cassazione - Sezione/Collegio 5": "Corte di Cassazione",
+            "Sentenza del 09/11/2021 n. 5009 - Comm. Trib. Reg. per il Lazio Sezione/Collegio 10": "Comm. Trib. Reg. per il Lazio",
+            "Sentenza del 30/12/2024 n. 710 - Corte di giustizia tributaria di secondo grado del Piemonte - Sezione/Collegio 2":
+                "Corte di giustizia tributaria di secondo grado del Piemonte",
+            "Ordinanza del 12/03/2020 n. 45 - Corte Costituzionale": "Corte Costituzionale",
+            "Ordinanza del 12/03/2020 n. 45 - Tribunale - Sezione/Collegio CIV": "Tribunale",
+            "Sentenza del 01/02/2010 n. 12/2010 - Comm. Trib. Prov. Milano": "Comm. Trib. Prov. Milano",
+            "Determinazione del 19/12/2006 - Agenzia del Territorio": "Agenzia del Territorio",
+            "Decreto interministeriale del 21/12/1999 - Min. Finanze": "Min. Finanze",
+            "Legge del 23/12/1972 n. 821 -": "",
+            "Codice del processo amministrativo del 02/07/2010": "",
+            "": "",
+        }
+        for estremi, atteso in casi.items():
+            with self.subTest(estremi=estremi):
+                self.assertEqual(d.organ_from_estremi(estremi), atteso)
+
+    def test_sentenza_con_il_giudice(self):
+        html = giurisprudenza_html("Sentenza del 30/12/2024 n. 710 - Corte di giustizia tributaria di secondo grado del Piemonte - Sezione/Collegio 2", "Registro - Locazione")
+        doc, _ = d._parse_giurisprudenza_detail("giurisprudenza", "https://x/d?id=1", html)
+        self.assertEqual(doc.authority, "Corte di giustizia tributaria di secondo grado del Piemonte")
+        self.assertEqual(doc.title, "Registro - Locazione")
+
+    def test_titolo_segnaposto_sostituito_dagli_estremi(self):
+        estremi = "Sentenza del 30/12/2014 n. 27513 - Corte di Cassazione - Sezione/Collegio 5"
+        for segnaposto in ("Nessuna intitolazione presente", "Non disponibile", " <em>Non  disponibile</em> "):
+            with self.subTest(segnaposto=segnaposto):
+                doc, _ = d._parse_giurisprudenza_detail("giurisprudenza", "https://x/d?id=1", giurisprudenza_html(estremi, segnaposto, massima=segnaposto))
+                self.assertEqual(doc.title, estremi)
+
+    def test_con_titolo_segnaposto_gli_estremi_prima_della_massima(self):
+        # Come ripara_metadati.py, che la massima non la conosce: un refresh non deve rinominare di nuovo.
+        estremi = "Sentenza del 30/12/2014 n. 27513 - Corte di Cassazione - Sezione/Collegio 5"
+        doc, _ = d._parse_giurisprudenza_detail("giurisprudenza", "https://x/d?id=1",
+                                                giurisprudenza_html(estremi, "Nessuna intitolazione presente", massima="<p>Massima vera.</p>"))
+        self.assertEqual(doc.title, estremi)
+
+    def test_normativa_organo_dagli_estremi_o_dagli_enti(self):
+        doc, _ = d._parse_normativa_detail(FakeHttp(), "normativa", "https://x/n?id=1", normativa_html("Decreto del 06/04/1973 - Min. Finanze"))
+        self.assertEqual(doc.authority, "Min. Finanze")
+        doc, _ = d._parse_normativa_detail(FakeHttp(), "normativa", "https://x/n?id=1", normativa_html("Legge regionale del 09/07/1997 n. 23 -", "Umbria"))
+        self.assertEqual(doc.authority, "Umbria")
+        doc, _ = d._parse_normativa_detail(FakeHttp(), "normativa", "https://x/n?id=1", normativa_html("Legge del 23/12/1972 n. 821 -"))
+        self.assertEqual(doc.authority, "")
+
+    def test_il_giudice_va_nel_nome_del_file(self):
+        doc = d.Doc(source="giurisprudenza/sentenza", title="Registro", document_date="2024-12-30",
+                    document_type="Sentenza", number="710", authority="Corte di giustizia tributaria di secondo grado del Piemonte")
+        self.assertEqual(d.file_prefix(doc), "2024-12-30_Sentenza_710_Corte_di_giustizia_tributaria_di_secondo_grado_del_Piemonte_")
+
+    def test_la_prassi_non_cambia_nome(self):
+        doc = d.Doc(source="agenzia-entrate/circolari", title="Oggetto", document_date="2001-05-11",
+                    document_type="Circolare", number="46", authority="Agenzia delle Entrate")
+        self.assertEqual(d.file_prefix(doc), "2001-05-11_Circolare_46_")
+
+    def test_nome_del_file_entro_255_byte(self):
+        doc = d.Doc(source="normativa/decreto-del-presidente-della-repubblica", title="T" * 300, document_date="2024-01-01",
+                    document_type="Decreto del Presidente della Repubblica", number="123456/2024", authority="A" * 200)
+        with tempfile.TemporaryDirectory() as tmp:
+            out = d.Store(Path(tmp), "normativa/x", "refresh").choose_path(doc.title, doc.document_date, "https://x", ".html", d.file_prefix(doc))
+        self.assertLessEqual(len(out.name.encode("utf-8")), 255)
+
+    def test_refresh_aggiorna_l_organo_anche_con_file_invariato(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = d.Store(Path(tmp), "giurisprudenza/sentenza", "refresh")
+            doc = d.Doc(source="giurisprudenza/sentenza", title="Registro", document_date="2024-12-30", document_type="Sentenza",
+                        number="710", detail_url="https://x/d?id=1", download_url="https://x/d?id=1")
+            with mock.patch("builtins.print"):
+                d.download_document(None, store, doc, "refresh", content=b"<html>x</html>")
+                again = d.Doc(**{**d.asdict(doc), "authority": "Corte di Cassazione", "local_file": "", "sha256": ""})
+                d.download_document(None, store, again, "refresh", content=b"<html>x</html>")
+            row = store.existing["https://x/d?id=1"]
+            self.assertEqual(row["authority"], "Corte di Cassazione")
+            self.assertIn("Corte_di_Cassazione", row["local_file"])
+            self.assertTrue((store.root / row["local_file"]).is_file())
+
+
 CURATED_YAML = """
 sorgenti:
   - id: comune-prova
@@ -315,7 +446,7 @@ class FakeFetcher:
 class CuratedTest(unittest.TestCase):
     """Kind "curated": elenco curato in YAML, una sorgente per amministrazione."""
 
-    HTML = b"<html><body>" + b"Regolamento dell'imposta di soggiorno. " * 10 + b"</body></html>"
+    HTML = b"<html><body>" + b"Regolamento dell'imposta di soggiorno. " * 30 + b"</body></html>"
     PDF = b"%PDF-1.4 tariffe"
     URL_HTML = "https://www.comune.prova.it/regolamento"
     URL_PDF = "https://www.comune.prova.it/tariffe.pdf"
@@ -398,7 +529,7 @@ class CuratedTest(unittest.TestCase):
 
     def test_refresh_con_sha_cambiato_sovrascrive_e_registra_aggiornato(self):
         self.run_source({self.URL_HTML: self.HTML, self.URL_PDF: self.PDF})
-        nuovo = b"<html><body>" + b"Regolamento modificato. " * 20 + b"</body></html>"
+        nuovo = b"<html><body>" + b"Regolamento modificato. " * 50 + b"</body></html>"
         _, _, stats = self.run_source({self.URL_HTML: nuovo, self.URL_PDF: self.PDF})
         self.assertEqual((stats["downloaded"], stats["updated"], stats["unchanged"]), (0, 1, 1))
         root = self.root / "archivio" / "locazioni/comune-prova"
@@ -428,6 +559,98 @@ class CuratedTest(unittest.TestCase):
         self.assertEqual((stats["downloaded"], stats["errors"]), (1, 1))
         log = (self.root / "archivio" / "locazioni/comune-prova" / "errors.log").read_text(encoding="utf-8")
         self.assertIn("senza testo", log)
+
+    def voce(self, titolo="Regolamento imposta di soggiorno", **campi):
+        """Aggiunge campi alla voce già caricata (come se fossero nello YAML)."""
+        v = next(v for v in self.sources["locazioni/comune-prova"]["voci"] if v["titolo"] == titolo)
+        v.update(campi)
+        return v
+
+    def log(self):
+        return (self.root / "archivio" / "locazioni/comune-prova" / "errors.log").read_text(encoding="utf-8")
+
+    def test_solo_link_non_scarica(self):
+        self.voce(solo_link="si")
+        http, _, stats = self.run_source({self.URL_PDF: self.PDF})
+        self.assertNotIn(self.URL_HTML, http.urls)
+        self.assertEqual((stats["downloaded"], stats["solo_link"], stats["errors"]), (1, 1, 0))
+        self.assertIn("solo link", self.log())
+        self.assertEqual([r["title"] for r in self.manifest()], ["Tariffe 2026"])
+
+    def test_solo_link_al_refresh_toglie_file_e_riga_gia_scaricati(self):
+        self.run_source({self.URL_HTML: self.HTML, self.URL_PDF: self.PDF})
+        self.voce(solo_link="si")
+        self.run_source({self.URL_PDF: self.PDF})
+        self.assertEqual([r["title"] for r in self.manifest()], ["Tariffe 2026"])
+        files = sorted(p.name for p in (self.root / "archivio" / "locazioni/comune-prova" / "files").iterdir())
+        self.assertEqual(files, ["tariffe-2026.pdf"])
+
+    def test_voce_non_piu_verificata_al_refresh_toglie_file_e_riga(self):
+        self.run_source({self.URL_HTML: self.HTML, self.URL_PDF: self.PDF})
+        self.voce(verificato="no")
+        self.run_source({self.URL_PDF: self.PDF})
+        self.assertEqual([r["title"] for r in self.manifest()], ["Tariffe 2026"])
+        files = sorted(p.name for p in (self.root / "archivio" / "locazioni/comune-prova" / "files").iterdir())
+        self.assertEqual(files, ["tariffe-2026.pdf"])
+
+    def test_documento_scarica_il_file_collegato_al_posto_della_scheda(self):
+        pdf_url = "https://www.comune.prova.it/regolamento.pdf/@@download/file"
+        self.voce(documento=pdf_url)
+        http, _, stats = self.run_source({pdf_url: self.PDF, self.URL_PDF: self.PDF})
+        self.assertNotIn(self.URL_HTML, http.urls)
+        self.assertEqual(stats["downloaded"], 2)
+        r = {r["title"]: r for r in self.manifest()}["Regolamento imposta di soggiorno"]
+        self.assertEqual((r["detail_url"], r["download_url"]), (self.URL_HTML, pdf_url))
+        self.assertEqual(r["local_file"], "files/regolamento-imposta-di-soggiorno.pdf")
+        # Al refresh la voce si ritrova dalla scheda: invariata, non riscaricata come nuova.
+        _, _, stats = self.run_source({pdf_url: self.PDF, self.URL_PDF: self.PDF})
+        self.assertEqual((stats["downloaded"], stats["unchanged"]), (0, 2))
+
+    def test_pagina_sospetta_scaricata_ma_segnalata(self):
+        # Scheda che annuncia un PDF: molto menu, poche righe utili nel <main>.
+        menu = "<nav>" + "Voce di menu del portale regionale " * 40 + "</nav>"
+        scheda = f"<html><body>{menu}<main>È stata emanata la circolare (PDF).</main></body></html>".encode()
+        _, _, stats = self.run_source({self.URL_HTML: scheda, self.URL_PDF: self.PDF})
+        self.assertEqual((stats["downloaded"], stats["sospette"], stats["errors"]), (2, 1, 0))
+        self.assertIn("pagina sospetta", self.log())
+        self.assertIn("testo utile", self.log())
+
+    def test_refresh_con_pagina_di_blocco_tiene_la_versione_buona(self):
+        # Ministero del Turismo il 2026-11-15: al posto del comunicato la pagina captcha di Radware.
+        self.run_source({self.URL_HTML: self.HTML, self.URL_PDF: self.PDF})
+        captcha = b"<html><head><title>Radware Captcha Page</title></head><body><div>" + b"Verifica di essere umano. " * 10 + b"</div></body></html>"
+        _, _, stats = self.run_source({self.URL_HTML: captcha, self.URL_PDF: self.PDF})
+        self.assertEqual((stats["updated"], stats["tenute_precedenti"], stats["sospette"]), (0, 1, 1))
+        root = self.root / "archivio" / "locazioni/comune-prova"
+        self.assertEqual((root / "files/regolamento-imposta-di-soggiorno.html").read_bytes(), self.HTML)
+        r = {r["title"]: r for r in self.manifest()}["Regolamento imposta di soggiorno"]
+        self.assertEqual(r["sha256"], hashlib.sha256(self.HTML).hexdigest())
+        self.assertIn("tenuta la versione precedente", self.log())
+
+    def test_refresh_di_pagina_gia_sospetta_si_aggiorna(self):
+        corta = b"<html><body><main>" + b"Delibera approvata, vedi PDF. " * 10 + b"</main></body></html>"
+        self.run_source({self.URL_HTML: corta, self.URL_PDF: self.PDF})
+        nuova = b"<html><body><main>" + b"Delibera approvata e modificata, vedi PDF. " * 10 + b"</main></body></html>"
+        _, _, stats = self.run_source({self.URL_HTML: nuova, self.URL_PDF: self.PDF})
+        self.assertEqual((stats["updated"], stats["tenute_precedenti"]), (1, 0))
+
+    def test_pagina_di_login_segnalata(self):
+        login = ("<html><body><main>" + "Portale per i gestori delle strutture ricettive. " * 30
+                 + '<form><input type="password"></form></main></body></html>').encode()
+        _, _, stats = self.run_source({self.URL_HTML: login, self.URL_PDF: self.PDF})
+        self.assertEqual(stats["sospette"], 1)
+        self.assertIn("password", self.log())
+
+    def test_pagina_buona_non_segnalata(self):
+        _, _, stats = self.run_source({self.URL_HTML: self.HTML, self.URL_PDF: self.PDF})
+        self.assertEqual(stats["sospette"], 0)
+        self.assertNotIn("sospetta", self.log())
+
+    def test_solo_link_e_documento_insieme_rifiutati(self):
+        text = CURATED_YAML.replace('        note: ""\n', '        note: ""\n        solo_link: "si"\n        documento: "https://x.it/a.pdf"\n', 1)
+        self.yaml_path.write_text(text, encoding="utf-8")
+        with self.assertRaises(ValueError):
+            d.curated_sources(self.yaml_path)
 
     def test_sorgente_senza_voci_non_fallisce(self):
         _, _, stats = self.run_source({}, name="locazioni/regione-prova")

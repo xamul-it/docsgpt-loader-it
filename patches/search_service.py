@@ -5,7 +5,9 @@ also carries ``url``, the public link to the original document, built from
 DOC_LINKS_FILE like the web UI's source links (retriever/labels.py patch).
 Upstream drops the source id before returning, so a client (e.g. Claude via
 MCP) could not rebuild the link from ``source`` alone. Everything else is
-upstream's file as of image arc53/docsgpt 2026-11-02 (copy in
+upstream's file as of image arc53/docsgpt 2026-11-02, plus (below
+``search``) ``search_documents`` and the source catalog (``list_sources``,
+selection by name or group) used by the MCP tools (copy in
 search_service.py.upstream); after an image upgrade, diff against the new one.
 
 Flask-free. Raises domain exceptions (``InvalidAPIKey``, ``SearchFailed``)
@@ -15,8 +17,12 @@ MCP error responses, etc.).
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 from typing import Any, Dict, List, Optional
+
+from sqlalchemy import text as _sql
 
 from docsgpt.core.settings import settings
 from docsgpt.retriever.fanout import fetch_per_source
@@ -35,6 +41,10 @@ class InvalidAPIKey(Exception):
 
 class SearchFailed(Exception):
     """Unexpected error during retrieval (e.g. DB outage). Caller maps to 5xx."""
+
+
+class UnknownSource(ValueError):
+    """A requested source/group matches none of the agent's sources."""
 
 
 def _collect_source_ids(agent: Dict[str, Any]) -> List[str]:
@@ -314,17 +324,130 @@ _TS_CONFIG = "italian"
 _EXCLUSION_RE = _re.compile(r"(^|\s)-\S")
 
 
-def _agent_source_ids(api_key: str) -> List[str]:
+# Source catalog, from the source lists kept in the repository (loader/fonti,
+# mounted read-only): every ``sorgenti`` entry of every *.yaml there that has a
+# ``nome`` gives that source its ``gruppo`` (the entry's ``gruppo_catalogo``,
+# else its ``gruppo``, else the file's top-level one; in pipeline.yaml
+# ``gruppo`` is also a folder name, so the shown one goes in ``gruppo_catalogo``), ``descrizione`` and ``peso`` (weight of its hits in the fused
+# ranking, default 1). Read on every call: the files are small and edits apply
+# without a restart.
+_CATALOG_DIR = os.environ.get("CATALOGO_FONTI", "/app/fonti")
+
+
+def _weight(value: Any, path: str) -> float:
+    """A catalog ``peso``: a positive number, else 1 (with a warning if set)."""
+    if value is None:
+        return 1.0
+    try:
+        weight = float(value)
+    except (TypeError, ValueError):
+        weight = 0.0
+    if weight > 0:
+        return weight
+    logger.warning(f"Source catalog {path}: invalid peso {value!r}, using 1")
+    return 1.0
+
+
+def _catalog() -> Dict[str, Dict[str, Any]]:
+    import glob
+
+    import yaml
+
+    catalog: Dict[str, Dict[str, Any]] = {}
+    for path in sorted(glob.glob(os.path.join(_CATALOG_DIR, "*.yaml"))):
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+            file_group = data.get("gruppo")
+            for entry in data.get("sorgenti") or []:
+                if isinstance(entry, dict) and entry.get("nome"):
+                    catalog[str(entry["nome"])] = {
+                        "gruppo": entry.get("gruppo_catalogo") or entry.get("gruppo") or file_group,
+                        "descrizione": entry.get("descrizione"),
+                        "peso": _weight(entry.get("peso"), path),
+                    }
+        except Exception as e:
+            logger.warning(f"Source catalog {path} unreadable: {e}")
+    return catalog
+
+
+def _agent_sources(api_key: str) -> List[Dict[str, Any]]:
+    """The agent's authorized sources, in agent order, with name and group.
+
+    Each item: ``id``, ``nome``, ``gruppo``, ``descrizione``, ``aggiornata``
+    (date of the last load, AAAA-MM-GG), ``peso``. Group, description and
+    weight come from the catalog; a source missing from it falls back to the
+    "<gruppo> - <nome>" naming convention, then to its own name, and weight 1.
+    """
     try:
         with db_readonly() as conn:
             agent = AgentsRepository(conn).find_by_key(api_key)
             if not agent:
                 raise InvalidAPIKey()
-            return _authorized_source_ids(conn, agent, _collect_source_ids(agent))
+            ids = [s for s in _authorized_source_ids(conn, agent, _collect_source_ids(agent))
+                   if s and s.strip()]
+            rows = conn.execute(
+                _sql("SELECT id::text AS id, name, date FROM sources WHERE id = ANY(CAST(:ids AS uuid[]))"),
+                {"ids": ids},
+            ).mappings().all() if ids else []
     except InvalidAPIKey:
         raise
     except Exception as e:
         raise SearchFailed("agent lookup failed") from e
+    by_id = {r["id"]: r for r in rows}
+    catalog = _catalog()
+    out = []
+    for sid in ids:
+        row = by_id.get(sid)
+        name = row["name"] if row else sid
+        entry = catalog.get(name) or {}
+        group = entry.get("gruppo") or (name.split(" - ", 1)[0] if " - " in name else name)
+        out.append({
+            "id": sid,
+            "nome": name,
+            "gruppo": group,
+            "descrizione": entry.get("descrizione"),
+            "aggiornata": row["date"].date().isoformat() if row and row["date"] else None,
+            "peso": entry.get("peso", 1.0),
+        })
+    return out
+
+
+def list_sources(api_key: str) -> List[Dict[str, Any]]:
+    """The sources the caller can search, sorted by group and name."""
+    sources = _agent_sources(api_key)
+    return sorted(({k: v for k, v in s.items() if k not in ("id", "peso")} for s in sources),
+                  key=lambda s: (s["gruppo"].casefold(), s["nome"].casefold()))
+
+
+def _select_sources(sources: List[Dict[str, Any]], wanted: Optional[List[str]]) -> List[Dict[str, Any]]:
+    """Sources whose name or group matches one of ``wanted`` (case-insensitive).
+
+    The part of a name before " - " also matches: a source split in parts
+    ("Normativa - Decreti", "Normativa - Comunicati", ...) is selected whole
+    by its prefix ("Normativa"), whatever its group. ``None`` or empty selects
+    everything. A name matching nothing raises
+    ``UnknownSource`` listing what is available, so the caller can retry
+    instead of reading an empty result as "nothing found".
+    """
+    wanted = [w.strip() for w in (wanted or []) if w and w.strip()]
+    if not wanted:
+        return sources
+    selected, unknown = [], []
+    for w in wanted:
+        key = w.casefold()
+        hits = [s for s in sources
+                if key in (s["nome"].casefold(), s["gruppo"].casefold(),
+                           s["nome"].split(" - ", 1)[0].casefold())]
+        if not hits:
+            unknown.append(w)
+        selected += [s for s in hits if s not in selected]
+    if unknown:
+        names = "; ".join(f'{s["nome"]} (gruppo {s["gruppo"]})' for s in sources)
+        raise UnknownSource(
+            f"Fonte sconosciuta: {', '.join(unknown)}. Fonti disponibili: {names}"
+        )
+    return selected
 
 
 _TSV_COLUMN = "tsv_it"
@@ -355,12 +478,86 @@ def _has_tsv_column(docsearch: Any, table: str) -> bool:
     return _tsv_column_cache[table]
 
 
+# Relaxed (OR) query: lexemes found in more than this fraction of the chunks
+# are left out. A natural-language question OR-ed in full ("vendo casa fatto
+# pago anni fa ...") matched 63% of Normativa, and ranking all of it took
+# 3 s alone and past the timeout under concurrent searches (issue #4); the
+# rare terms alone take 0.06-0.2 s, and common terms barely move ts_rank_cd.
+_OR_MAX_FREQ = 0.05
+# ...but at least this many lexemes are kept (the rarest), so a question
+# made only of common words still has a keyword half.
+_OR_MIN_TERMS = 2
+# Lexeme frequencies come from the column statistics (pg_stats, refreshed by
+# ANALYZE): reread after this many seconds.
+_FREQ_TTL_S = 3600
+_freq_cache: Dict[str, tuple] = {}
+_LEXEME_RE = _re.compile(r"'((?:[^']|'')*)'")
+
+
+def _lexeme_freqs(docsearch: Any, table: str) -> Dict[str, float]:
+    """``{lexeme: fraction of rows}`` for the most common lexemes of the tsvector column."""
+    import time
+
+    cached = _freq_cache.get(table)
+    if cached and time.monotonic() - cached[0] < _FREQ_TTL_S:
+        return cached[1]
+    freqs: Dict[str, float] = {}
+    conn = docsearch._get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "SELECT most_common_elems::text::text[], most_common_elem_freqs FROM pg_stats "
+            "WHERE tablename = %s AND attname = %s",
+            (table, _TSV_COLUMN),
+        )
+        row = cursor.fetchone()
+        if row and row[0] and row[1]:
+            # most_common_elem_freqs ends with 3 extra values (min, max, null
+            # frequency): zip stops at the last lexeme.
+            freqs = dict(zip(row[0], row[1]))
+        conn.commit()
+    except Exception as e:
+        logger.warning(f"Lexeme statistics unavailable on {table}: {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+    finally:
+        cursor.close()
+    _freq_cache[table] = (time.monotonic(), freqs)
+    return freqs
+
+
+def _relaxed_tsquery(strict: str, freqs: Dict[str, float]) -> str:
+    """OR form of the strict tsquery text, without the most common lexemes.
+
+    Lexemes above ``_OR_MAX_FREQ`` are dropped, keeping at least the
+    ``_OR_MIN_TERMS`` rarest; lexemes missing from ``freqs`` count as rare.
+    A query with phrases (``<->``) keeps every term and only has its ``&``
+    turned into ``|``, as before: those come from keywords written by the
+    caller, short and chosen on purpose.
+    """
+    if "<" in strict:
+        return strict.replace(" & ", " | ")
+    lexemes: List[str] = []
+    for lex in _LEXEME_RE.findall(strict):
+        if lex not in lexemes:
+            lexemes.append(lex)
+    kept = [lex for lex in lexemes if freqs.get(lex.replace("''", "'"), 0.0) <= _OR_MAX_FREQ]
+    if len(kept) < min(_OR_MIN_TERMS, len(lexemes)):
+        rarest = sorted(lexemes, key=lambda lex: freqs.get(lex.replace("''", "'"), 0.0))
+        rarest = set(rarest[:_OR_MIN_TERMS])
+        kept = [lex for lex in lexemes if lex in rarest]
+    return " | ".join(f"'{lex}'" for lex in kept)
+
+
 def _keyword_hits(docsearch: Any, source_id: str, text: str, k: int) -> List[tuple]:
     """Italian full-text hits of one pgvector source as ``(text, metadata, relaxed)``.
 
     Strict query first (all terms, phrases, exclusions as written); when it
-    finds nothing, the same terms joined by OR, flagged ``relaxed`` (skipped
-    when the text has exclusions: OR-ing "-term" would match almost anything).
+    finds nothing, the terms joined by OR without the most common ones (see
+    ``_relaxed_tsquery``), flagged ``relaxed`` (skipped when the text has
+    exclusions: OR-ing "-term" would match almost anything).
     Non-pgvector stores return ``[]``.
     """
     if not hasattr(docsearch, "_get_connection") or not getattr(docsearch, "_table_name", None):
@@ -368,30 +565,28 @@ def _keyword_hits(docsearch: Any, source_id: str, text: str, k: int) -> List[tup
     table = docsearch._table_name
     text_col = getattr(docsearch, "_text_column", "text")
     meta_col = getattr(docsearch, "_metadata_column", "metadata")
-    tsv = (
-        _TSV_COLUMN
-        if _has_tsv_column(docsearch, table)
-        else f"to_tsvector('{_TS_CONFIG}'::regconfig, {text_col})"
-    )
+    has_tsv = _has_tsv_column(docsearch, table)
+    tsv = _TSV_COLUMN if has_tsv else f"to_tsvector('{_TS_CONFIG}'::regconfig, {text_col})"
+    freqs = _lexeme_freqs(docsearch, table) if has_tsv else {}
     sql = (
-        f"SELECT {text_col}, {meta_col} FROM {table}, ({{q}}) AS q(query) "
+        f"SELECT {text_col}, {meta_col} FROM {table}, (SELECT %s::tsquery) AS q(query) "
         f"WHERE source_id = %s AND numnode(q.query) > 0 AND {tsv} @@ q.query "
         f"ORDER BY ts_rank_cd({tsv}, q.query) DESC LIMIT %s"
-    )
-    strict = f"SELECT websearch_to_tsquery('{_TS_CONFIG}'::regconfig, %s)"
-    relaxed = (
-        f"SELECT replace(websearch_to_tsquery('{_TS_CONFIG}'::regconfig, %s)::text, ' & ', ' | ')::tsquery"
     )
     conn = docsearch._get_connection()
     cursor = conn.cursor()
     hits: List[tuple] = []
     try:
         cursor.execute(f"SET LOCAL statement_timeout = {int(_KEYWORD_TIMEOUT_MS)}")
+        cursor.execute(f"SELECT websearch_to_tsquery('{_TS_CONFIG}'::regconfig, %s)::text", (text,))
+        strict = cursor.fetchone()[0] or ""
         attempts = [(strict, False)]
         if not _EXCLUSION_RE.search(text):
-            attempts.append((relaxed, True))
-        for query_sql, is_relaxed in attempts:
-            cursor.execute(sql.format(q=query_sql), (text, source_id, k))
+            relaxed = _relaxed_tsquery(strict, freqs)
+            if relaxed and relaxed != strict:
+                attempts.append((relaxed, True))
+        for query_text, is_relaxed in attempts:
+            cursor.execute(sql, (query_text, source_id, k))
             rows = cursor.fetchall()
             hits = [(t, m or {}, is_relaxed) for t, m in rows]
             if hits:
@@ -409,6 +604,114 @@ def _keyword_hits(docsearch: Any, source_id: str, text: str, k: int) -> List[tup
     return hits
 
 
+# ---------------------------------------------------------------------------
+# Explicit references ("circolare 21/E del 2016", "d.lgs. 472/1997"), issue #5.
+# The full-text half cannot tell the document that *is* circolare 21/E 2016
+# from the dozens that cite it, but the loader names every file
+# "<date>_<Type>_<number>_<title>", so the cited act is found by its path.
+# Its first passage goes on top of the results, found_by "riferimento".
+# ---------------------------------------------------------------------------
+
+# (pattern, type as written in the file names); decreto-legge before legge.
+_REF_TYPES = (
+    (r"decreto[\s-]+legge|d\.\s?l\.|dl", "Decreto-legge"),
+    (r"decreto\s+legislativo|d\.\s?lgs\.?|dlgs\.?", "Decreto_legislativo"),
+    (r"decreto\s+del\s+presidente\s+della\s+repubblica|d\.\s?p\.\s?r\.?|dpr",
+     "Decreto_del_Presidente_della_Repubblica"),
+    (r"circolar[ei]|circ\.", "Circolare"),
+    (r"risoluzion[ei]|ris\.", "Risoluzione"),
+    (r"rispost[ae]\s+(?:ad?\s+)?interpell[oi]|interpell[oi]|rispost[ae]", "Interpello"),
+    (r"comunicat[oi]\s+stampa|comunicat[oi]", "Comunicato_Stampa"),
+    (r"sentenz[ae]|sent\.", "Sentenza"),
+    (r"ordinanz[ae]|ord\.", "Ordinanza"),
+    (r"legge|l\.", "Legge"),
+)
+_REF_RE = _re.compile(
+    r"(?<![\w.])(?:" + "|".join(f"(?P<t{i}>{p})" for i, (p, _) in enumerate(_REF_TYPES)) + r")"
+    r"(?![a-zà-ù])\s*(?:n(?:um(?:ero)?)?\s*[.°º]?\s*)?"
+    r"(?P<num>\d{1,6})(?![\d,]|\.\d)"
+    r"(?:\s*/\s*(?P<lett>[a-z])(?![a-z]))?"
+    r"(?:\s*/\s*(?P<anno>(?:19|20)\d{2})(?!\d))?",
+    _re.I,
+)
+_YEAR_RE = _re.compile(r"(?<!\d)((?:19|20)\d{2})(?!\d)")
+# How far after the number the year may be: "21/E del 25 maggio 2016".
+_REF_YEAR_WINDOW = 40
+_REF_MAX = 3
+_REF_MAX_DOCS = 5
+
+
+def _parse_references(text: str) -> List[Dict[str, Optional[str]]]:
+    """Acts cited by type and number (and year, when given) in ``text``."""
+    matches = list(_REF_RE.finditer(text or ""))
+    refs: List[Dict[str, Optional[str]]] = []
+    for i, m in enumerate(matches):
+        tipo = next(_REF_TYPES[int(g[1:])][1] for g, v in m.groupdict().items() if g.startswith("t") and v)
+        anno = m.group("anno")
+        if not anno:
+            # The year may follow ("del 2016", "del 25/5/2016"), up to the next reference.
+            end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+            y = _YEAR_RE.search(text[m.end():min(end, m.end() + _REF_YEAR_WINDOW)])
+            anno = y.group(1) if y else None
+        lett = m.group("lett")
+        ref = {"tipo": tipo, "numero": m.group("num"), "lettera": lett.upper() if lett else None, "anno": anno}
+        if ref not in refs:
+            refs.append(ref)
+    return refs[:_REF_MAX]
+
+
+def _reference_path_regex(ref: Dict[str, Optional[str]]) -> str:
+    """Postgres regex on the document path: "2016-05-25_Circolare_21_..." for circolare 21/E 2016.
+
+    The Agenzia delle Entrate names its acts "21/E" but its files carry the
+    bare number; ADM files keep the letter ("Circolare_78-D_").
+    """
+    year = ref["anno"] or "[0-9]{4}"
+    num, lett = ref["numero"], ref["lettera"]
+    if lett is None:
+        num_rx = f"{num}(-[A-Z])?_"
+    elif lett == "E":
+        num_rx = f"{num}(-E)?_"
+    else:
+        num_rx = f"{num}-{lett}_"
+    return f"(^|/){year}-[0-9]{{2}}-[0-9]{{2}}_{ref['tipo']}_{num_rx}"
+
+
+def _reference_hits(docsearch: Any, source_id: str, refs: List[Dict[str, Optional[str]]]) -> List[tuple]:
+    """First passage of each document of the source matching a reference, as ``(text, metadata)``."""
+    if not refs or not hasattr(docsearch, "_get_connection") or not getattr(docsearch, "_table_name", None):
+        return []
+    table = docsearch._table_name
+    text_col = getattr(docsearch, "_text_column", "text")
+    meta_col = getattr(docsearch, "_metadata_column", "metadata")
+    path = f"({meta_col}->>'source')"
+    sql = (
+        f"SELECT {text_col}, {meta_col} FROM ("
+        f"SELECT DISTINCT ON ({path}) id, {text_col}, {meta_col} FROM {table} "
+        f"WHERE source_id = %s AND {path} ~ %s ORDER BY {path}, id"
+        f") d ORDER BY {path} DESC LIMIT %s"
+    )
+    conn = docsearch._get_connection()
+    cursor = conn.cursor()
+    hits: List[tuple] = []
+    try:
+        cursor.execute(f"SET LOCAL statement_timeout = {int(_KEYWORD_TIMEOUT_MS)}")
+        for ref in refs:
+            cursor.execute(sql, (source_id, _reference_path_regex(ref), _REF_MAX_DOCS))
+            hits += [(t, m or {}) for t, m in cursor.fetchall()]
+        conn.commit()
+    except Exception as e:
+        logger.warning(f"Reference lookup failed on {source_id}: {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        hits = []
+    finally:
+        cursor.close()
+    return hits
+
+
 def _search_one_hybrid(
     source_id: str,
     docsearch: Any,
@@ -416,8 +719,9 @@ def _search_one_hybrid(
     keywords: str,
     k: int,
     query_vector: Optional[List[float]],
+    refs: Optional[List[Dict[str, Optional[str]]]] = None,
 ) -> Optional[tuple]:
-    """``(vector_pairs, keyword_hits)`` for one source, or None on failure."""
+    """``(vector_pairs, keyword_hits, reference_hits)`` for one source, or None on failure."""
     try:
         if docsearch is None:
             docsearch = VectorCreator.create_vectorstore(
@@ -431,7 +735,7 @@ def _search_one_hybrid(
         else:
             vector = [(doc, None) for doc in docsearch.search(query, **kwargs)]
         keyword = _keyword_hits(docsearch, source_id, keywords, k) if keywords else []
-        return vector, keyword
+        return vector, keyword, _reference_hits(docsearch, source_id, refs or [])
     except Exception as e:
         logger.error(f"Error searching vectorstore {source_id}: {e}", exc_info=True)
         return None
@@ -446,26 +750,68 @@ def _doc_fields(doc: Any) -> tuple:
     return "", {}
 
 
+def _fuse(
+    vector_list: List[tuple],
+    keyword_list: List[tuple],
+    reference_list: List[tuple],
+    weight: Any,
+) -> Dict[tuple, float]:
+    """Fused score of each chunk key.
+
+    ``vector_list``: ``(similarity, key)``; ``keyword_list``: ``(rank in its
+    source, source order, key)``; ``reference_list``: keys of the cited acts,
+    in order; ``weight(key)``: the ``peso`` of the source the chunk comes from.
+
+    Global ranks. Vector: by similarity across sources. Keyword: ts_rank is
+    not comparable across sources, so sources are interleaved by in-source
+    rank. The two Reciprocal Rank Fusion terms are multiplied by the source
+    weight; the ranks themselves are not, so a weight only reorders hits of
+    sources with different weights. The acts the question names come first,
+    ahead of any fused score (< 2/_RRF_K), whatever their source's weight.
+    """
+    rrf: Dict[tuple, float] = {}
+    for rank, (_sim, key) in enumerate(sorted(vector_list, key=lambda v: v[0], reverse=True)):
+        rrf[key] = rrf.get(key, 0.0) + 1.0 / (_RRF_K + rank)
+    for rank, (_r, _s, key) in enumerate(sorted(keyword_list, key=lambda v: (v[0], v[1]))):
+        rrf[key] = rrf.get(key, 0.0) + 1.0 / (_RRF_K + rank)
+    fused = {key: score * weight(key) for key, score in rrf.items()}
+    for rank, key in enumerate(reference_list):
+        fused[key] = fused.get(key, 0.0) + 1.0 - rank / 1000.0
+    return fused
+
+
 def search_documents(
-    api_key: str, query: str, max_documents: int = 10, keywords: Optional[str] = None
+    api_key: str,
+    query: str,
+    max_documents: int = 10,
+    keywords: Optional[str] = None,
+    sources: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     """Hybrid search over the agent's sources, returning distinct documents.
 
     ``keywords`` drives the full-text half (websearch syntax: "exact phrase",
     OR, -exclude); when omitted, ``query`` is used for both halves.
+    ``sources`` restricts the search to the named sources or groups (see
+    ``_select_sources``); omitted, every source of the agent is searched.
 
     Each result: ``title``, ``date`` (from the file name, when present),
-    ``ente`` (archive folder), ``url`` (public link, when known), ``source``
+    ``fonte`` (source name), ``ente`` (archive folder), ``url`` (public link,
+    when known), ``source``
     (path inside the DocsGPT source), ``similarity`` (best cosine similarity
     among its passages, when found semantically), ``passages``: the most
     relevant excerpts, each with ``found_by`` (semantica / parole chiave /
-    entrambe) and ``similarity``. Results are ordered by fused rank.
+    entrambe / riferimento) and ``similarity``. Results are ordered by fused
+    rank, after the acts the question cites by type, number and year
+    (``found_by`` "riferimento", see ``_parse_references``).
     """
     max_documents = max(1, min(int(max_documents or 10), MAX_DOCUMENTS))
     keywords = (keywords or query or "").strip()
-    source_ids = [s for s in _agent_source_ids(api_key) if s and s.strip()]
+    selected = _select_sources(_agent_sources(api_key), sources)
+    source_ids = [s["id"] for s in selected]
     if not source_ids:
         return []
+    source_names = {s["id"]: s["nome"] for s in selected}
+    refs = _parse_references(f"{query} {keywords}")
 
     fetched = fetch_per_source(
         source_ids,
@@ -473,7 +819,7 @@ def search_documents(
             settings.VECTOR_STORE, sid, settings.EMBEDDINGS_KEY
         ),
         lambda sid, docsearch, qv: _search_one_hybrid(
-            sid, docsearch, query, keywords, _CHUNKS_PER_SOURCE, qv
+            sid, docsearch, query, keywords, _CHUNKS_PER_SOURCE, qv, refs
         ),
         lambda _sid: query,
     )
@@ -482,6 +828,7 @@ def search_documents(
     chunks: Dict[tuple, Dict[str, Any]] = {}
     vector_list: List[tuple] = []   # (similarity, chunk key)
     keyword_list: List[tuple] = []  # (source order, rank in source, relaxed, chunk key)
+    reference_list: List[tuple] = []  # chunk keys of the cited acts, in order
 
     def _register(sid: str, text: str, metadata: Dict[str, Any]) -> tuple:
         doc_sid = metadata.get("source_id") or sid
@@ -489,13 +836,20 @@ def search_documents(
         key = (doc_sid, source, text.strip()[:300])
         if key not in chunks:
             chunks[key] = {"text": text, "metadata": metadata, "sid": doc_sid,
-                           "source": source, "similarity": None, "by": set()}
+                           "source": source, "similarity": None, "by": set(),
+                           "found_in": sid}
         return key
 
     for s_idx, (sid, result) in enumerate(zip(source_ids, fetched)):
         if not result:
             continue
-        vector, keyword = result
+        vector, keyword, reference = result
+        for text, metadata in reference:
+            if not text:
+                continue
+            key = _register(sid, text, metadata)
+            chunks[key]["by"].add("riferimento")
+            reference_list.append(key)
         for doc, score in vector:
             text, metadata = _doc_fields(doc)
             if not text:
@@ -512,15 +866,9 @@ def search_documents(
             chunks[key]["by"].add("parole chiave")
             keyword_list.append((rank + (_OR_RANK_PENALTY if relaxed else 0), s_idx, key))
 
-    # Global ranks. Vector: by similarity across sources. Keyword: ts_rank is
-    # not comparable across sources, so interleave sources by in-source rank.
-    fused: Dict[tuple, float] = {}
-    vector_list.sort(key=lambda v: v[0], reverse=True)
-    for rank, (_sim, key) in enumerate(vector_list):
-        fused[key] = fused.get(key, 0.0) + 1.0 / (_RRF_K + rank)
-    keyword_list.sort(key=lambda v: (v[0], v[1]))
-    for rank, (_r, _s, key) in enumerate(keyword_list):
-        fused[key] = fused.get(key, 0.0) + 1.0 / (_RRF_K + rank)
+    weights = {s["id"]: s.get("peso", 1.0) for s in selected}
+    fused = _fuse(vector_list, keyword_list, reference_list,
+                  lambda key: weights.get(chunks[key]["found_in"], 1.0))
 
     docs: Dict[tuple, Dict[str, Any]] = {}
     order: List[tuple] = []
@@ -535,7 +883,8 @@ def search_documents(
         by = c["by"]
         passage = {
             "text": c["text"],
-            "found_by": "entrambe" if len(by) > 1 else next(iter(by)),
+            "found_by": ("riferimento" if "riferimento" in by
+                         else "entrambe" if len(by) > 1 else next(iter(by))),
             "similarity": c["similarity"],
         }
         doc_key = (c["sid"], c["source"])
@@ -553,6 +902,7 @@ def search_documents(
         docs[doc_key] = {
             "title": title,
             "date": date.group(1) if date else None,
+            "fonte": source_names.get(c["sid"]),
             "ente": ente,
             "url": url,
             "source": c["source"],
