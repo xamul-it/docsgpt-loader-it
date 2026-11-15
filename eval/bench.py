@@ -1,6 +1,8 @@
 # Benchmark di search_docs: eseguito dentro il container backend, legge le domande
 # (JSON) da stdin e stampa una riga JSONL per domanda e modalità.
 #   A = solo la domanda;  B = domanda + keywords (campo keywords della domanda o KW, come le passerebbe Claude).
+# Il campo sources della domanda passa a search_docs in entrambe le modalità; "fuori" conta i
+# risultati di altre fonti (atteso 0).
 # Uso (dalla radice del repository):
 #   python3 -c "import yaml,json;json.dump(yaml.safe_load(open('eval/domande.yaml')),open('/tmp/d.json','w'))"
 #   KEY=$(docker exec docsgpt-postgres-1 psql -U docsgpt -d docsgpt -Atc \
@@ -26,7 +28,7 @@ for q in qs:
     for mode in ('A', 'B'):
         kw = (q.get('keywords') or KW.get(q['id'])) if mode == 'B' else None
         t = time.time()
-        try: res = search_documents(key, q['domanda'], 10, kw); err = None
+        try: res = search_documents(key, q['domanda'], 10, kw, q.get('sources')); err = None
         except Exception as e: res, err = [], repr(e)
         dt = time.time() - t
         paths = [urllib.parse.unquote(r.get('url', '')).split('/docs/', 1)[-1] for r in res]
@@ -35,5 +37,6 @@ for q in qs:
             rk = next((i + 1 for i, p in enumerate(paths) if fnmatch.fnmatch(p, pat)), None)
             ranks.append(rk)
         print(json.dumps({'id': q['id'], 'cat': q['categoria'], 'mode': mode, 'kw': kw, 'ranks': ranks,
-                          'sec': round(dt, 1), 'chars': len(json.dumps(res, ensure_ascii=False)), 'err': err,
+                          'sec': round(dt, 1),
+                          'fuori': sum(r.get('fonte') not in q['sources'] for r in res) if q.get('sources') else None, 'chars': len(json.dumps(res, ensure_ascii=False)), 'err': err,
                           'top3': [p.rsplit('/', 1)[-1][:70] for p in paths[:3]]}, ensure_ascii=False), flush=True)

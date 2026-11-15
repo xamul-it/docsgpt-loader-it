@@ -88,5 +88,67 @@ class Riferimenti(unittest.TestCase):
                          "(^|/)2014-[0-9]{2}-[0-9]{2}_Legge_190(-[A-Z])?_")
 
 
+FONTI = [
+    {"id": "1", "nome": "Agenzia Entrate", "gruppo": "Fisco"},
+    {"id": "2", "nome": "Normativa - Decreti", "gruppo": "Fisco"},
+    {"id": "3", "nome": "Normativa - Comunicati", "gruppo": "Fisco"},
+    {"id": "4", "nome": "Locazioni - Bologna", "gruppo": "Locazioni"},
+]
+
+
+class SceltaFonti(unittest.TestCase):
+    """Selezione delle fonti per nome, gruppo o prefisso del nome (issue #7)."""
+
+    def ids(self, wanted):
+        return [f["id"] for f in s._select_sources(FONTI, wanted)]
+
+    def test_prefisso_seleziona_tutte_le_parti(self):
+        self.assertEqual(self.ids(["normativa"]), ["2", "3"])
+
+    def test_una_parte_sola(self):
+        self.assertEqual(self.ids(["Normativa - Comunicati"]), ["3"])
+
+    def test_gruppo_comprende_le_parti(self):
+        self.assertEqual(self.ids(["Fisco"]), ["1", "2", "3"])
+
+    def test_prefisso_sconosciuto(self):
+        with self.assertRaises(s.UnknownSource):
+            s._select_sources(FONTI, ["Normativ"])
+
+
+class Peso(unittest.TestCase):
+    """Peso per sorgente nella fusione dei punteggi (issue #7)."""
+
+    PESI = {"a": 1.0, "b": 0.5}
+
+    def fuse(self, vector, keyword=(), refs=()):
+        return s._fuse(list(vector), list(keyword), list(refs), lambda key: self.PESI[key[0]])
+
+    def test_peso_fa_scendere_a_parita_di_pertinenza(self):
+        f = self.fuse([(0.80, ("b", "x")), (0.79, ("a", "y"))])
+        self.assertGreater(f[("a", "y")], f[("b", "x")])
+
+    def test_molto_pertinente_emerge_ancora(self):
+        # primo per similarità e per parole chiave contro un risultato solo semantico
+        f = self.fuse([(0.9, ("b", "x")), (0.5, ("a", "y"))], [(0, 0, ("b", "x"))])
+        self.assertGreater(f[("b", "x")], f[("a", "y")])
+
+    def test_peso_uniforme_non_cambia_l_ordine(self):
+        vector = [(0.9, ("b", "x")), (0.8, ("b", "y")), (0.7, ("b", "z"))]
+        pesati = self.fuse(vector)
+        senza = s._fuse(vector, [], [], lambda key: 1.0)
+        self.assertEqual(sorted(pesati, key=pesati.get), sorted(senza, key=senza.get))
+
+    def test_atto_citato_resta_primo(self):
+        f = self.fuse([(0.95, ("a", "y"))], refs=[("b", "x")])
+        self.assertGreater(f[("b", "x")], f[("a", "y")])
+
+    def test_peso_non_valido_vale_uno(self):
+        self.assertEqual(s._weight(None, "f"), 1.0)
+        self.assertEqual(s._weight("0,5", "f"), 1.0)
+        self.assertEqual(s._weight(0, "f"), 1.0)
+        self.assertEqual(s._weight(0.5, "f"), 0.5)
+
+
 if __name__ == "__main__":
     unittest.main()

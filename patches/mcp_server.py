@@ -121,8 +121,11 @@ async def search_docs(
         max_documents: numero massimo di documenti distinti (1-20, default 10).
         sources: facoltativo, nomi di fonti o di gruppi presi da list_sources
             (es. ["Codice civile"], ["Locazioni"], ["Agenzia Entrate",
-            "Giurisprudenza"]); maiuscole e minuscole indifferenti. Un nome
-            sconosciuto dà errore con l'elenco delle fonti disponibili.
+            "Giurisprudenza"]); maiuscole e minuscole indifferenti. Le fonti
+            divise in parti ("Normativa - Decreti", "Normativa - Comunicati",
+            …) si scelgono tutte insieme col prefisso (["Normativa"]) o una
+            per una col nome completo. Un nome sconosciuto dà errore con
+            l'elenco delle fonti disponibili.
 
     Per domande complesse fai più ricerche con formulazioni diverse.
 

@@ -180,6 +180,15 @@ domande:
   fatti: ["almeno le risposte 100/2026 e 48/2026"]
   trappola: "Includere circolari o interpelli di anni precedenti; con max_documents=10 l'elenco può essere incompleto."
 
+- id: fil-02
+  categoria: filtri
+  domanda: "Cerca solo nei comunicati: delibere approvate della cassa forense nel 2015."
+  # Passato a search_docs come lo passerebbe Claude; i risultati fuori da queste fonti contano come errore.
+  sources: ["Normativa - Comunicati"]
+  attesi: [normativa/comunicato/files/2015/2015-*_Approvazione_della_delibera_*forense*]
+  fatti: ["comunicato del Ministero del Lavoro sull'approvazione di una delibera del Comitato dei delegati della Cassa nazionale di previdenza ed assistenza forense (22 agosto o 17 settembre 2015)"]
+  trappola: "Rispondere con documenti fuori dai comunicati (decreti, giurisprudenza, prassi) o con delibere di altre casse."
+
 # --- Codice civile (fonte codici/codice-civile) -----------------------------
 - id: codice-civile-01
   categoria: riferimento-esatto

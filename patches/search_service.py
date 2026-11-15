@@ -327,9 +327,24 @@ _EXCLUSION_RE = _re.compile(r"(^|\s)-\S")
 # Source catalog, from the source lists kept in the repository (loader/fonti,
 # mounted read-only): every ``sorgenti`` entry of every *.yaml there that has a
 # ``nome`` gives that source its ``gruppo`` (the entry's, else the file's
-# top-level one) and ``descrizione``. Read on every call: the files are small
-# and edits apply without a restart.
+# top-level one), ``descrizione`` and ``peso`` (weight of its hits in the fused
+# ranking, default 1). Read on every call: the files are small and edits apply
+# without a restart.
 _CATALOG_DIR = os.environ.get("CATALOGO_FONTI", "/app/fonti")
+
+
+def _weight(value: Any, path: str) -> float:
+    """A catalog ``peso``: a positive number, else 1 (with a warning if set)."""
+    if value is None:
+        return 1.0
+    try:
+        weight = float(value)
+    except (TypeError, ValueError):
+        weight = 0.0
+    if weight > 0:
+        return weight
+    logger.warning(f"Source catalog {path}: invalid peso {value!r}, using 1")
+    return 1.0
 
 
 def _catalog() -> Dict[str, Dict[str, Any]]:
@@ -348,6 +363,7 @@ def _catalog() -> Dict[str, Dict[str, Any]]:
                     catalog[str(entry["nome"])] = {
                         "gruppo": entry.get("gruppo") or file_group,
                         "descrizione": entry.get("descrizione"),
+                        "peso": _weight(entry.get("peso"), path),
                     }
         except Exception as e:
             logger.warning(f"Source catalog {path} unreadable: {e}")
@@ -358,9 +374,9 @@ def _agent_sources(api_key: str) -> List[Dict[str, Any]]:
     """The agent's authorized sources, in agent order, with name and group.
 
     Each item: ``id``, ``nome``, ``gruppo``, ``descrizione``, ``aggiornata``
-    (date of the last load, AAAA-MM-GG). Group and description come from the
-    catalog; a source missing from it falls back to the "<gruppo> - <nome>"
-    naming convention, then to its own name.
+    (date of the last load, AAAA-MM-GG), ``peso``. Group, description and
+    weight come from the catalog; a source missing from it falls back to the
+    "<gruppo> - <nome>" naming convention, then to its own name, and weight 1.
     """
     try:
         with db_readonly() as conn:
@@ -391,6 +407,7 @@ def _agent_sources(api_key: str) -> List[Dict[str, Any]]:
             "gruppo": group,
             "descrizione": entry.get("descrizione"),
             "aggiornata": row["date"].date().isoformat() if row and row["date"] else None,
+            "peso": entry.get("peso", 1.0),
         })
     return out
 
@@ -398,14 +415,17 @@ def _agent_sources(api_key: str) -> List[Dict[str, Any]]:
 def list_sources(api_key: str) -> List[Dict[str, Any]]:
     """The sources the caller can search, sorted by group and name."""
     sources = _agent_sources(api_key)
-    return sorted(({k: v for k, v in s.items() if k != "id"} for s in sources),
+    return sorted(({k: v for k, v in s.items() if k not in ("id", "peso")} for s in sources),
                   key=lambda s: (s["gruppo"].casefold(), s["nome"].casefold()))
 
 
 def _select_sources(sources: List[Dict[str, Any]], wanted: Optional[List[str]]) -> List[Dict[str, Any]]:
     """Sources whose name or group matches one of ``wanted`` (case-insensitive).
 
-    ``None`` or empty selects everything. A name matching nothing raises
+    The part of a name before " - " also matches: a source split in parts
+    ("Normativa - Decreti", "Normativa - Comunicati", ...) is selected whole
+    by its prefix ("Normativa"), whatever its group. ``None`` or empty selects
+    everything. A name matching nothing raises
     ``UnknownSource`` listing what is available, so the caller can retry
     instead of reading an empty result as "nothing found".
     """
@@ -415,7 +435,9 @@ def _select_sources(sources: List[Dict[str, Any]], wanted: Optional[List[str]]) 
     selected, unknown = [], []
     for w in wanted:
         key = w.casefold()
-        hits = [s for s in sources if key in (s["nome"].casefold(), s["gruppo"].casefold())]
+        hits = [s for s in sources
+                if key in (s["nome"].casefold(), s["gruppo"].casefold(),
+                           s["nome"].split(" - ", 1)[0].casefold())]
         if not hits:
             unknown.append(w)
         selected += [s for s in hits if s not in selected]
@@ -727,6 +749,36 @@ def _doc_fields(doc: Any) -> tuple:
     return "", {}
 
 
+def _fuse(
+    vector_list: List[tuple],
+    keyword_list: List[tuple],
+    reference_list: List[tuple],
+    weight: Any,
+) -> Dict[tuple, float]:
+    """Fused score of each chunk key.
+
+    ``vector_list``: ``(similarity, key)``; ``keyword_list``: ``(rank in its
+    source, source order, key)``; ``reference_list``: keys of the cited acts,
+    in order; ``weight(key)``: the ``peso`` of the source the chunk comes from.
+
+    Global ranks. Vector: by similarity across sources. Keyword: ts_rank is
+    not comparable across sources, so sources are interleaved by in-source
+    rank. The two Reciprocal Rank Fusion terms are multiplied by the source
+    weight; the ranks themselves are not, so a weight only reorders hits of
+    sources with different weights. The acts the question names come first,
+    ahead of any fused score (< 2/_RRF_K), whatever their source's weight.
+    """
+    rrf: Dict[tuple, float] = {}
+    for rank, (_sim, key) in enumerate(sorted(vector_list, key=lambda v: v[0], reverse=True)):
+        rrf[key] = rrf.get(key, 0.0) + 1.0 / (_RRF_K + rank)
+    for rank, (_r, _s, key) in enumerate(sorted(keyword_list, key=lambda v: (v[0], v[1]))):
+        rrf[key] = rrf.get(key, 0.0) + 1.0 / (_RRF_K + rank)
+    fused = {key: score * weight(key) for key, score in rrf.items()}
+    for rank, key in enumerate(reference_list):
+        fused[key] = fused.get(key, 0.0) + 1.0 - rank / 1000.0
+    return fused
+
+
 def search_documents(
     api_key: str,
     query: str,
@@ -783,7 +835,8 @@ def search_documents(
         key = (doc_sid, source, text.strip()[:300])
         if key not in chunks:
             chunks[key] = {"text": text, "metadata": metadata, "sid": doc_sid,
-                           "source": source, "similarity": None, "by": set()}
+                           "source": source, "similarity": None, "by": set(),
+                           "found_in": sid}
         return key
 
     for s_idx, (sid, result) in enumerate(zip(source_ids, fetched)):
@@ -812,18 +865,9 @@ def search_documents(
             chunks[key]["by"].add("parole chiave")
             keyword_list.append((rank + (_OR_RANK_PENALTY if relaxed else 0), s_idx, key))
 
-    # Global ranks. Vector: by similarity across sources. Keyword: ts_rank is
-    # not comparable across sources, so interleave sources by in-source rank.
-    fused: Dict[tuple, float] = {}
-    vector_list.sort(key=lambda v: v[0], reverse=True)
-    for rank, (_sim, key) in enumerate(vector_list):
-        fused[key] = fused.get(key, 0.0) + 1.0 / (_RRF_K + rank)
-    keyword_list.sort(key=lambda v: (v[0], v[1]))
-    for rank, (_r, _s, key) in enumerate(keyword_list):
-        fused[key] = fused.get(key, 0.0) + 1.0 / (_RRF_K + rank)
-    # The acts the question names come first, ahead of any fused score (< 2/_RRF_K).
-    for rank, key in enumerate(reference_list):
-        fused[key] = fused.get(key, 0.0) + 1.0 - rank / 1000.0
+    weights = {s["id"]: s.get("peso", 1.0) for s in selected}
+    fused = _fuse(vector_list, keyword_list, reference_list,
+                  lambda key: weights.get(chunks[key]["found_in"], 1.0))
 
     docs: Dict[tuple, Dict[str, Any]] = {}
     order: List[tuple] = []
