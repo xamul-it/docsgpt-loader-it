@@ -4,15 +4,19 @@ carica_docsgpt.py
 
 Carica su DocsGPT le raccolte scaricate da downloader.py, una sorgente per ente.
 Le fonti sulle locazioni (cartelle locazioni/<id>) sono sorgenti a sé, una per
-amministrazione, con il nome dato in fonti/locazioni.yaml.
+amministrazione, con il nome dato in fonti/locazioni.yaml. La normativa è divisa
+in più sorgenti per gruppi di tipologie (fonti/fisco.yaml, campi cartella,
+tipologie e resto): in un'unica sorgente il worker di DocsGPT va in OOM (#7).
 
 Uso:
   python carica_docsgpt.py --target /data/rag                       # tutti gli enti presenti
   python carica_docsgpt.py --target /data/rag --source agenzia-entrate
-  python carica_docsgpt.py --target /data/rag --source normativa --replace
+  python carica_docsgpt.py --target /data/rag --source normativa --replace          # tutte le parti
+  python carica_docsgpt.py --target /data/rag --source normativa:decreti --replace
   python carica_docsgpt.py --target /data/rag --source locazioni --agent "Archivio documentale"
 
-Per ogni ente (cartella di primo livello dell'archivio, oppure locazioni/<id>):
+Per ogni ente (cartella di primo livello dell'archivio, oppure locazioni/<id>,
+oppure una parte <cartella>:<parte> di una cartella divisa):
   - impacchetta in uno zip non compresso i soli documenti citati nei manifest
     (<tipologia>/files/...); manifest, log, cartelle di debug e file orfani
     restano fuori. Nello zip il livello "files" viene tolto:
@@ -40,6 +44,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import time
@@ -65,7 +70,6 @@ SOURCE_NAMES = {
     "agenzia-entrate": "Agenzia Entrate",
     "ministero-finanze": "Ministero Finanze",
     "agenzia-dogane-monopoli": "Agenzia Dogane e Monopoli",
-    "normativa": "Normativa",
     "giurisprudenza": "Giurisprudenza",
 }
 
@@ -94,11 +98,67 @@ def pipeline_names(path: Path) -> dict[str, str]:
             if s.get("gruppo") and s.get("id") and not s.get("provvisorio")}
 
 
+def slug(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.casefold()).strip("-")
+
+
+def split_sources(path: Path) -> dict[str, dict]:
+    """Cartelle divise in più sorgenti (fonti/fisco.yaml): chiave <cartella>:<parte> ->
+    {"nome", "cartella", "tipologie" (insieme delle sottocartelle), "resto" (bool)}.
+
+    <parte> è il nome della sorgente dopo " - ", in minuscolo e con i trattini
+    ("Normativa - Atti UE" -> normativa:atti-ue).
+    """
+    import yaml  # senza yaml la normativa non si carica affatto: meglio che in un pezzo solo
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    out = {}
+    for s in data.get("sorgenti") or []:
+        if not s.get("cartella"):
+            continue
+        part = s["nome"].split(" - ", 1)[-1]
+        out[f"{s['cartella']}:{slug(part)}"] = {
+            "nome": s["nome"], "cartella": s["cartella"],
+            "tipologie": set(s.get("tipologie") or []), "resto": bool(s.get("resto")),
+        }
+    for cartella in {v["cartella"] for v in out.values()}:
+        parts = [v for v in out.values() if v["cartella"] == cartella]
+        if sum(v["resto"] for v in parts) > 1:
+            raise ValueError(f"{path}: più di una sorgente con resto per la cartella {cartella}")
+        seen: dict[str, str] = {}
+        for v in parts:
+            for tip in v["tipologie"]:
+                if tip in seen:
+                    raise ValueError(f"{path}: tipologia {cartella}/{tip} sia in \"{seen[tip]}\" sia in \"{v['nome']}\"")
+                seen[tip] = v["nome"]
+    return out
+
+
+def ente_dir(ente: str) -> str:
+    """Cartella dell'archivio dell'ente (per una parte, quella divisa)."""
+    return ente.split(":", 1)[0]
+
+
+def wants_tipologia(ente: str, tipologia: str) -> bool:
+    """Se la tipologia (sottocartella) appartiene all'ente; sempre sì per gli enti non divisi."""
+    split = SPLITS.get(ente)
+    if split is None:
+        return True
+    if split["resto"]:
+        others = set().union(*(v["tipologie"] for v in SPLITS.values() if v["cartella"] == split["cartella"]))
+        return tipologia not in others
+    return tipologia in split["tipologie"]
+
+
 SOURCE_NAMES.update(locazioni_names(Path(__file__).resolve().parent / "fonti" / "locazioni.yaml"))
+SPLITS = split_sources(Path(__file__).resolve().parent / "fonti" / "fisco.yaml")
+SOURCE_NAMES.update({k: v["nome"] for k, v in SPLITS.items()})
 PIPELINE_NAMES = pipeline_names(Path(__file__).resolve().parent / "fonti" / "pipeline.yaml")
 SOURCE_NAMES.update(PIPELINE_NAMES)
 # --source locazioni = tutte le sorgenti locazioni/<id>; --source <gruppo> = le fonti della pipeline del gruppo.
 GROUPS = {"locazioni": [e for e in SOURCE_NAMES if e.startswith("locazioni/")]}
+# --source normativa = tutte le parti della cartella divisa.
+for _e in SPLITS:
+    GROUPS.setdefault(ente_dir(_e), []).append(_e)
 for _e in PIPELINE_NAMES:
     GROUPS.setdefault(_e.split("/", 1)[0], []).append(_e)
 
@@ -113,11 +173,17 @@ def log(msg: str) -> None:
     print(f"{datetime.now():%Y-%m-%d %H:%M:%S} {msg}", flush=True)
 
 
-def ente_documents(ente_dir: Path) -> list[tuple[Path, str]]:
-    """Documenti dell'ente come (percorso su disco, percorso nello zip)."""
+def ente_documents(root: Path, ente: str = "") -> list[tuple[Path, str]]:
+    """Documenti dell'ente come (percorso su disco, percorso nello zip).
+
+    Con ``ente`` una parte di una cartella divisa (normativa:decreti), solo le
+    tipologie di quella parte; ``root`` resta la cartella divisa.
+    """
     docs = []
-    for files_dir in sorted(ente_dir.glob("**/files")):
+    for files_dir in sorted(root.glob("**/files")):
         source_dir = files_dir.parent
+        if ente and source_dir != root and not wants_tipologia(ente, source_dir.relative_to(root).parts[0]):
+            continue
         manifest = source_dir / "manifest.jsonl"
         if manifest.exists():
             # Solo i file del manifest: su disco possono restare orfani di vecchi scarichi.
@@ -125,7 +191,7 @@ def ente_documents(ente_dir: Path) -> list[tuple[Path, str]]:
             paths = sorted({source_dir / r["local_file"] for r in rows if r.get("local_file")})
         else:
             paths = sorted(p for p in files_dir.rglob("*") if p.is_file())
-        tipologia = source_dir.relative_to(ente_dir).as_posix()
+        tipologia = source_dir.relative_to(root).as_posix()
         for path in paths:
             if not path.is_file() or path.stat().st_size == 0:
                 continue
@@ -133,6 +199,10 @@ def ente_documents(ente_dir: Path) -> list[tuple[Path, str]]:
             # Ente senza tipologie (locazioni/<id>): niente "./" davanti.
             docs.append((path, inside if tipologia == "." else f"{tipologia}/{inside}"))
     return docs
+
+
+def documents_of(target: Path, ente: str) -> list[tuple[Path, str]]:
+    return ente_documents(target / ente_dir(ente), ente)
 
 
 def build_zip(docs: list[tuple[Path, str]], zip_path: Path) -> None:
@@ -297,14 +367,14 @@ def load_ente(api: str, target: Path, ente: str, tmp_dir: Path, replace: bool, d
             attach_to_agent(api, agent_name, existing[0])
         return True
 
-    docs = ente_documents(target / ente)
+    docs = documents_of(target, ente)
     if not docs:
         log("    nessun documento, salto")
         return False
     size = sum(p.stat().st_size for p, _ in docs)
     log(f"    documenti: {len(docs)}, {size / 1e9:.2f} GB")
 
-    zip_path = tmp_dir / f"{ente.replace('/', '_')}.zip"
+    zip_path = tmp_dir / f"{re.sub(r'[/:]', '_', ente)}.zip"
     started = time.time()
     try:
         build_zip(docs, zip_path)
@@ -325,7 +395,8 @@ def load_ente(api: str, target: Path, ente: str, tmp_dir: Path, replace: bool, d
             delete_source(api, new_id)
         raise
     if new_id:
-        register_links(links_file, docs_url, ente, new_id, existing, depth=0 if "/" in ente else 1)
+        folder = ente_dir(ente)
+        register_links(links_file, docs_url, folder, new_id, existing, depth=0 if "/" in folder else 1)
     # Letti solo ora: gli agenti potrebbero essere cambiati durante l'indicizzazione.
     agents = agents_using(api, existing)
     if agents and new_id:
@@ -335,7 +406,12 @@ def load_ente(api: str, target: Path, ente: str, tmp_dir: Path, replace: bool, d
     for source_id in existing:
         log(f"    elimino la sorgente precedente {source_id}")
         delete_source(api, source_id)
-    clear_novita(api, ente)
+    if ente in SPLITS:
+        # Solo le tipologie della parte: le altre restano nelle novità finché non si carica la loro.
+        for tipologia in sorted({arc.split("/", 1)[0] for _, arc in docs}):
+            clear_novita(api, f"{ente_dir(ente)}/{tipologia}")
+    else:
+        clear_novita(api, ente)
     log(f"    completato in {(time.time() - started) / 60:.1f} minuti")
     return True
 
@@ -347,7 +423,7 @@ def get_args():
         "--source",
         action="append",
         choices=list(SOURCE_NAMES) + list(GROUPS),
-        help="Ente da caricare, o il gruppo locazioni (ripetibile; default: tutti quelli presenti)",
+        help="Ente da caricare, o un gruppo (locazioni, normativa = tutte le sue parti; ripetibile; default: tutti quelli presenti)",
     )
     p.add_argument("--replace", action="store_true", help="Ricarica le sorgenti già presenti (la vecchia viene eliminata a nuova pronta)")
     p.add_argument("--agent", default="", help="Agente a cui collegare le sorgenti caricate (di solito per quelle nuove)")
@@ -364,11 +440,11 @@ def main() -> int:
     if args.source:
         enti = [e for s in args.source for e in GROUPS.get(s, [s])]
     else:
-        enti = [e for e in SOURCE_NAMES if (target / e).is_dir()]
+        enti = [e for e in SOURCE_NAMES if (target / ente_dir(e)).is_dir()]
 
     # Dal più piccolo al più grande: i problemi emergono prima sui carichi brevi.
     def ente_size(ente: str) -> int:
-        return sum(p.stat().st_size for p, _ in ente_documents(target / ente))
+        return sum(p.stat().st_size for p, _ in documents_of(target, ente))
 
     enti = sorted(enti, key=ente_size)
 
