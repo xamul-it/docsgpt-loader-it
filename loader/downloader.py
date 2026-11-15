@@ -388,10 +388,22 @@ def circolare_number(text: str) -> str:
     return re.sub(r"\s+", "", m.group(1)) if m else ""
 
 
+# Raccolte in cui il giudice o l'organo emanante fa parte del nome del file:
+# DocsGPT non legge il manifest e mostra il nome del file come titolo (issue #2).
+AUTHORITY_IN_FILENAME = ("giurisprudenza", "normativa")
+
+# Nomi di file entro i 255 byte del filesystem: il titolo si accorcia se il
+# prefisso è lungo.
+MAX_NAME_BEFORE_TITLE = 200
+
+
 def file_prefix(doc: "Doc") -> str:
-    """Prefisso "data_tipo_numero_": rende il file riconoscibile senza manifest."""
+    """Prefisso "data_tipo_numero_[organo_]": rende il file riconoscibile senza manifest."""
     parts = [doc.document_date, doc.document_type if doc.number else "", doc.number]
-    return "".join(ascii_slug(x, 40) + "_" for x in parts if x)
+    prefix = "".join(ascii_slug(x, 40) + "_" for x in parts if x)
+    if doc.authority and doc.source.split("/")[0] in AUTHORITY_IN_FILENAME:
+        prefix += ascii_slug(doc.authority, 80) + "_"
+    return prefix
 
 
 def sha256_file(path: Path) -> str:
@@ -711,7 +723,7 @@ class Store:
         folder = self.files / year
         folder.mkdir(parents=True, exist_ok=True)
 
-        base = ascii_slug(title, 120)
+        base = ascii_slug(title, max(30, min(120, MAX_NAME_BEFORE_TITLE - len(prefix))))
         digest = hashlib.sha1(url.encode("utf-8")).hexdigest()[:10]
         return folder / f"{prefix}{base}__{digest}{ext}"
 
@@ -760,7 +772,8 @@ class SplitStore:
 def relocate_existing(store: Store, doc: Doc, old: dict, out: Path) -> None:
     """Documento già scaricato: allinea nome file e metadati senza riscaricarlo."""
     old_path = store.root / old["local_file"]
-    if out == old_path and old.get("title") == doc.title and old.get("number", "") == doc.number:
+    if (out == old_path and old.get("title") == doc.title and old.get("number", "") == doc.number
+            and old.get("authority", "") == doc.authority):
         return None
     if out != old_path:
         os.replace(old_path, out)
@@ -1365,6 +1378,30 @@ def _authority_from_estremi(text: str) -> str:
     return norm_text(m.group(1)) if m else ""
 
 
+# Titoli che CeRDEF mette al posto di un'intitolazione mancante.
+PLACEHOLDER_TITLES = {"nessuna intitolazione presente", "non disponibile"}
+
+
+def real_title(s: str) -> str:
+    """Titolo in testo semplice, vuoto se è solo un segnaposto."""
+    t = clean_title(s)
+    return "" if t.lower() in PLACEHOLDER_TITLES else t
+
+
+def organ_from_estremi(text: str) -> str:
+    """Giudice o organo emanante dagli estremi di giurisprudenza e normativa.
+
+    "Sentenza del 09/11/2021 n. 5009 - Comm. Trib. Reg. per il Lazio Sezione/Collegio 10"
+    -> "Comm. Trib. Reg. per il Lazio". La sezione si toglie; "Legge del ... n. 821 -"
+    non indica l'organo e dà "".
+    """
+    m = re.search(r"\bdel\s+\d{1,2}/\d{1,2}/\d{4}(?:\s+n\.\s*\S+)?\s*-(.*)$", norm_text(text))
+    if not m:
+        return ""
+    organ = re.sub(r"\s*-?\s*Sezione/Collegio\b.*$", "", m.group(1))
+    return norm_text(organ).strip(" -")
+
+
 def _doctype_from_estremi(text: str, default: str) -> str:
     # Il tipo è tutto ciò che precede la data: "Decreto del Presidente della
     # Repubblica del 26/10/1972 n. 633", "Decreto-legge del ...".
@@ -1493,13 +1530,17 @@ def _parse_giurisprudenza_detail(source_name: str, detail_url: str, html: str):
     estremi = norm_text(prov.findtext("estremi") or "")
     intitolazione = clean_title(prov.findtext(".//intitolazione") or "")
     massima = ((prov.findtext(".//massima") or "")).strip()
-    title = intitolazione or clean_title(massima) or estremi or detail_url
+    if intitolazione.lower() in PLACEHOLDER_TITLES:
+        # Titolo di ripiego: tipo, data, numero e giudice (come ripara_metadati.py).
+        title = estremi or real_title(massima) or detail_url
+    else:
+        title = intitolazione or real_title(massima) or estremi or detail_url
 
     doc = Doc(
         source=source_name,
         title=title,
         document_date=guess_date(estremi),
-        authority=_authority_from_estremi(estremi),
+        authority=organ_from_estremi(estremi),
         document_type=_doctype_from_estremi(estremi, "Giurisprudenza"),
         number=number_from_estremi(estremi),
         detail_url=detail_url,
@@ -1582,7 +1623,8 @@ def _parse_normativa_detail(http: Http, source_name: str, detail_url: str, html:
         source=source_name,
         title=title,
         document_date=guess_date(estremi),
-        authority="",
+        authority=organ_from_estremi(estremi) or norm_text("; ".join(
+            norm_text(e.text) for e in root.iterfind("intestazione/enti/ente") if norm_text(e.text))),
         document_type=_doctype_from_estremi(estremi, ""),
         number=number_from_estremi(estremi),
         detail_url=detail_url,

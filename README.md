@@ -12,6 +12,7 @@ repository aggiunge solo ciò che serve per le fonti normative italiane.
 |---|---|
 | `loader/downloader.py` | Scarica le raccolte ufficiali (CeDEF / def.finanze.it per normativa e giurisprudenza tributaria, siti di Agenzia delle Entrate, MEF, ADM) in cartelle per ente e tipologia, con `manifest.jsonl` (titolo, data, ente, URL, sha256). Modalità `refresh` incrementale. |
 | `loader/carica_docsgpt.py` | Carica ogni ente su DocsGPT come sorgente, sostituisce la versione precedente e ricollega gli agenti. |
+| `loader/ripara_metadati.py` | Ripara i manifest di giurisprudenza e normativa senza riscaricare i documenti: giudice o organo (`authority`), titolo di ripiego al posto di "Nessuna intitolazione presente" e "Non disponibile", file rinominati col giudice nel nome (issue #2). |
 | `loader/quadratura.py` | Controlli di coerenza tra archivio su disco e sorgenti caricate. |
 | `notifier/` | Servizio che segue le novità (feed degli enti e refresh periodico dell'archivio), le indicizza e ne invia la sintesi. |
 | `patches/` | Modifiche al backend DocsGPT montate nel container: server MCP con `search_docs(query, keywords, max_documents)` (ricerca ibrida), servizio di ricerca, etichette. I file `*.upstream` sono gli originali di riferimento. |

@@ -277,6 +277,108 @@ class SplitStoreTest(unittest.TestCase):
                 self.assertTrue(rows[0]["local_file"].startswith("files/2024/"))
 
 
+def giurisprudenza_html(estremi, intitolazione, massima="<p>Massima.</p>", allegato="false"):
+    xml = (
+        f'<risultatiRicerca><risultati><Provvedimento idProvvedimento="{{G1}}" allegato="{allegato}">'
+        f'<estremi link="false">{estremi}</estremi><titoliProvvedimento><titoloProvvedimento>'
+        f'<intitolazione><![CDATA[{intitolazione}]]></intitolazione><massima><![CDATA[{massima}]]></massima>'
+        '</titoloProvvedimento></titoliProvvedimento></Provvedimento></risultati></risultatiRicerca>'
+    )
+    return "<script>var xmlDettaglio = '" + xml.replace("'", "\\'") + "';</script>"
+
+
+def normativa_html(estremi, ente=""):
+    xml = (
+        "<documento><id>{N1}</id><intestazione>"
+        f"<estremiAtto>{estremi}</estremiAtto><titoloAtto>Titolo atto</titoloAtto>"
+        f"<enti><ente>{ente}</ente></enti><gazzettaUfficiale>GU</gazzettaUfficiale>"
+        "</intestazione><sommario/></documento>"
+    )
+    return "<script>var xmlSommario = '" + xml + "';</script>"
+
+
+class AuthorityTest(unittest.TestCase):
+    """Giudice e organo emanante dagli estremi CeRDEF (issue #2)."""
+
+    def test_organo_dagli_estremi(self):
+        casi = {
+            "Sentenza del 07/09/2022 n. 26348 - Corte di Cassazione - Sezione/Collegio 5": "Corte di Cassazione",
+            "Sentenza del 09/11/2021 n. 5009 - Comm. Trib. Reg. per il Lazio Sezione/Collegio 10": "Comm. Trib. Reg. per il Lazio",
+            "Sentenza del 30/12/2024 n. 710 - Corte di giustizia tributaria di secondo grado del Piemonte - Sezione/Collegio 2":
+                "Corte di giustizia tributaria di secondo grado del Piemonte",
+            "Ordinanza del 12/03/2020 n. 45 - Corte Costituzionale": "Corte Costituzionale",
+            "Ordinanza del 12/03/2020 n. 45 - Tribunale - Sezione/Collegio CIV": "Tribunale",
+            "Sentenza del 01/02/2010 n. 12/2010 - Comm. Trib. Prov. Milano": "Comm. Trib. Prov. Milano",
+            "Determinazione del 19/12/2006 - Agenzia del Territorio": "Agenzia del Territorio",
+            "Decreto interministeriale del 21/12/1999 - Min. Finanze": "Min. Finanze",
+            "Legge del 23/12/1972 n. 821 -": "",
+            "Codice del processo amministrativo del 02/07/2010": "",
+            "": "",
+        }
+        for estremi, atteso in casi.items():
+            with self.subTest(estremi=estremi):
+                self.assertEqual(d.organ_from_estremi(estremi), atteso)
+
+    def test_sentenza_con_il_giudice(self):
+        html = giurisprudenza_html("Sentenza del 30/12/2024 n. 710 - Corte di giustizia tributaria di secondo grado del Piemonte - Sezione/Collegio 2", "Registro - Locazione")
+        doc, _ = d._parse_giurisprudenza_detail("giurisprudenza", "https://x/d?id=1", html)
+        self.assertEqual(doc.authority, "Corte di giustizia tributaria di secondo grado del Piemonte")
+        self.assertEqual(doc.title, "Registro - Locazione")
+
+    def test_titolo_segnaposto_sostituito_dagli_estremi(self):
+        estremi = "Sentenza del 30/12/2014 n. 27513 - Corte di Cassazione - Sezione/Collegio 5"
+        for segnaposto in ("Nessuna intitolazione presente", "Non disponibile", " <em>Non  disponibile</em> "):
+            with self.subTest(segnaposto=segnaposto):
+                doc, _ = d._parse_giurisprudenza_detail("giurisprudenza", "https://x/d?id=1", giurisprudenza_html(estremi, segnaposto, massima=segnaposto))
+                self.assertEqual(doc.title, estremi)
+
+    def test_con_titolo_segnaposto_gli_estremi_prima_della_massima(self):
+        # Come ripara_metadati.py, che la massima non la conosce: un refresh non deve rinominare di nuovo.
+        estremi = "Sentenza del 30/12/2014 n. 27513 - Corte di Cassazione - Sezione/Collegio 5"
+        doc, _ = d._parse_giurisprudenza_detail("giurisprudenza", "https://x/d?id=1",
+                                                giurisprudenza_html(estremi, "Nessuna intitolazione presente", massima="<p>Massima vera.</p>"))
+        self.assertEqual(doc.title, estremi)
+
+    def test_normativa_organo_dagli_estremi_o_dagli_enti(self):
+        doc, _ = d._parse_normativa_detail(FakeHttp(), "normativa", "https://x/n?id=1", normativa_html("Decreto del 06/04/1973 - Min. Finanze"))
+        self.assertEqual(doc.authority, "Min. Finanze")
+        doc, _ = d._parse_normativa_detail(FakeHttp(), "normativa", "https://x/n?id=1", normativa_html("Legge regionale del 09/07/1997 n. 23 -", "Umbria"))
+        self.assertEqual(doc.authority, "Umbria")
+        doc, _ = d._parse_normativa_detail(FakeHttp(), "normativa", "https://x/n?id=1", normativa_html("Legge del 23/12/1972 n. 821 -"))
+        self.assertEqual(doc.authority, "")
+
+    def test_il_giudice_va_nel_nome_del_file(self):
+        doc = d.Doc(source="giurisprudenza/sentenza", title="Registro", document_date="2024-12-30",
+                    document_type="Sentenza", number="710", authority="Corte di giustizia tributaria di secondo grado del Piemonte")
+        self.assertEqual(d.file_prefix(doc), "2024-12-30_Sentenza_710_Corte_di_giustizia_tributaria_di_secondo_grado_del_Piemonte_")
+
+    def test_la_prassi_non_cambia_nome(self):
+        doc = d.Doc(source="agenzia-entrate/circolari", title="Oggetto", document_date="2001-05-11",
+                    document_type="Circolare", number="46", authority="Agenzia delle Entrate")
+        self.assertEqual(d.file_prefix(doc), "2001-05-11_Circolare_46_")
+
+    def test_nome_del_file_entro_255_byte(self):
+        doc = d.Doc(source="normativa/decreto-del-presidente-della-repubblica", title="T" * 300, document_date="2024-01-01",
+                    document_type="Decreto del Presidente della Repubblica", number="123456/2024", authority="A" * 200)
+        with tempfile.TemporaryDirectory() as tmp:
+            out = d.Store(Path(tmp), "normativa/x", "refresh").choose_path(doc.title, doc.document_date, "https://x", ".html", d.file_prefix(doc))
+        self.assertLessEqual(len(out.name.encode("utf-8")), 255)
+
+    def test_refresh_aggiorna_l_organo_anche_con_file_invariato(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = d.Store(Path(tmp), "giurisprudenza/sentenza", "refresh")
+            doc = d.Doc(source="giurisprudenza/sentenza", title="Registro", document_date="2024-12-30", document_type="Sentenza",
+                        number="710", detail_url="https://x/d?id=1", download_url="https://x/d?id=1")
+            with mock.patch("builtins.print"):
+                d.download_document(None, store, doc, "refresh", content=b"<html>x</html>")
+                again = d.Doc(**{**d.asdict(doc), "authority": "Corte di Cassazione", "local_file": "", "sha256": ""})
+                d.download_document(None, store, again, "refresh", content=b"<html>x</html>")
+            row = store.existing["https://x/d?id=1"]
+            self.assertEqual(row["authority"], "Corte di Cassazione")
+            self.assertIn("Corte_di_Cassazione", row["local_file"])
+            self.assertTrue((store.root / row["local_file"]).is_file())
+
+
 CURATED_YAML = """
 sorgenti:
   - id: comune-prova
